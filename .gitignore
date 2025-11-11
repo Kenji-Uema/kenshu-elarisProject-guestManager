@@ -1,0 +1,42 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Output of go test
+*.cover
+*.coverprofile
+*.prof
+profile.out
+cover.out
+
+# Build directories
+bin/
+build/
+dist/
+
+# Module / build caches
+.cache/
+
+# Dependency directories
+vendor/
+
+# Logs
+*.log
+
+# Environment files
+.env
+.env.*
+
+# IDE / Editor directories
+.idea/
+.vscode/
+*.iml
+
+# OS metadata
+.DS_Store
+Thumbs.db
