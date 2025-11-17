@@ -21,7 +21,7 @@ func NewGuestRepo(db *mongo.Database, config *config.GuestCollectionConfig) port
 	return &guestRepo{collection: db.Collection(config.Name)}
 }
 
-func (g guestRepo) Get(ctx context.Context, id primitive.ObjectID) (domain.Guest, error) {
+func (g guestRepo) GetById(ctx context.Context, id primitive.ObjectID) (domain.Guest, error) {
 	if id == primitive.NilObjectID {
 		return domain.Guest{}, errors.New("guest id is required")
 	}
@@ -33,7 +33,16 @@ func (g guestRepo) Get(ctx context.Context, id primitive.ObjectID) (domain.Guest
 		return domain.Guest{}, err
 	}
 	return guest, nil
+}
 
+func (g guestRepo) GetByDocument(ctx context.Context, documentId string) (domain.Guest, error) {
+	result := g.collection.FindOne(ctx, bson.M{"document_id": documentId})
+
+	var guest domain.Guest
+	if err := result.Decode(&guest); err != nil {
+		return domain.Guest{}, err
+	}
+	return guest, nil
 }
 
 func (g guestRepo) Add(ctx context.Context, newGuest domain.Guest) (primitive.ObjectID, error) {

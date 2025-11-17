@@ -38,7 +38,7 @@ func (g guestHandler) GetGuest(c *gin.Context) {
 		return
 	}
 
-	guest, err := g.service.Get(c.Request.Context(), guestId)
+	guest, err := g.service.GetById(c.Request.Context(), guestId)
 
 	c.JSON(200, guest)
 }

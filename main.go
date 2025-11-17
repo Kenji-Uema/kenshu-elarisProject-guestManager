@@ -6,6 +6,7 @@ func main() {
 	router := gin.Default()
 
 	router.GET("/guest/:userId", nil)
+	router.GET("/guest/:userId/bookings", nil)
 	router.POST("/guest", nil)
 	router.PATCH("/guest/:userId", nil)
 

@@ -15,10 +15,19 @@ type MongoDbConfig struct {
 }
 
 type GuestCollectionConfig struct {
-	Name string `env:"GUEST_COLLECTION" envDefault:"GUEST"`
+	Name string `env:"GUEST_COLLECTION" envDefault:"Guest"`
 }
 
-func LoadConfig[C MongoDbConfig | GuestCollectionConfig]() *C {
+type CottageCollectionConfig struct {
+	Name string `env:"COTTAGE_COLLECTION" envDefault:"Cottage"`
+}
+
+type BookingCollectionConfig struct {
+	Name string `env:"BOOKING_COLLECTION" envDefault:"Booking"`
+}
+
+func LoadConfig[C MongoDbConfig | GuestCollectionConfig | CottageCollectionConfig |
+	BookingCollectionConfig]() *C {
 	var c C
 	if err := env.Parse(&c); err != nil {
 		log.Fatal(err)
