@@ -1,10 +1,16 @@
 package port
 
-import "context"
+import (
+	"context"
+	"guestManager/internal/config"
+	"guestManager/internal/domain"
+)
 
 type MqClient interface {
-	Close()
-	EnsureTopology() error
-	EnablePublisherConfirms() error
-	Publish(ctx context.Context, body []byte) error
+	CloseChannel()
+	EnsurePublisherTopology(config config.CleaningExchangeConfig) error
+}
+
+type MqPublisher interface {
+	Publish(ctx context.Context, message domain.RabbitMqMessage) error
 }
