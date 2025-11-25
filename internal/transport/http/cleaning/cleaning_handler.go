@@ -2,6 +2,7 @@ package cleaning
 
 import (
 	"guestManager/internal/app"
+	"guestManager/internal/domain"
 	"guestManager/internal/transport/http/common"
 	"net/http"
 
@@ -34,12 +35,15 @@ func (h cleaningHandler) CleanRoom(c *gin.Context) {
 		return
 	}
 
-	if needCleanQuery.Clean == common.PleaseClean {
-		h.service.CleanRoom(c.Request.Context(), roomUri.Number)
-
-		c.JSON(http.StatusOK, gin.H{"message": "Clean room request sent"})
+	err := h.service.CleanRoom(c.Request.Context(), domain.CleaningRequest{
+		RoomNumber: roomUri.Number,
+		Request:    needCleanQuery.Clean,
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "(do Not Disturb) Guest did not want to clean the room"})
+	c.JSON(http.StatusOK, gin.H{"message": "Clean room request sent"})
+	return
 }

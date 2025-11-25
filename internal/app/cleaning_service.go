@@ -2,34 +2,42 @@ package app
 
 import (
 	"context"
+	"guestManager/internal/domain"
 	"guestManager/internal/port"
+	"strconv"
 )
 
 type CleaningService interface {
-	CleanRoom(ctx context.Context, roomNumber int)
-	MakeupRoom(ctx context.Context, roomNumber int)
-	PrepareForNewGuest(ctx context.Context, roomNumber int)
+	CleanRoom(ctx context.Context, r domain.CleaningRequest) error
+	MakeupRoom(ctx context.Context, r domain.CleaningRequest) error
 }
 
 type cleaningService struct {
-	mqClient port.MqClient
+	publisher port.MqPublisher
 }
 
-func NewCleaningService(mqClient port.MqClient) CleaningService {
-	return &cleaningService{mqClient: mqClient}
+func NewCleaningService(publisher port.MqPublisher) CleaningService {
+	return &cleaningService{publisher: publisher}
 }
 
-func (c cleaningService) CleanRoom(ctx context.Context, roomNumber int) {
-	//TODO implement me
-	panic("implement me")
+func (c cleaningService) CleanRoom(ctx context.Context, r domain.CleaningRequest) error {
+	if r.Request == "DO_NOT_DISTURB" {
+		return nil
+	}
+
+	return c.publisher.Publish(ctx, domain.RabbitMqMessage{
+		Exchange:    "ex.cleanRoom",
+		Key:         strconv.Itoa(r.RoomNumber),
+		ContentType: "application/json",
+		Body:        nil,
+	})
 }
 
-func (c cleaningService) MakeupRoom(ctx context.Context, roomNumber int) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (c cleaningService) PrepareForNewGuest(ctx context.Context, roomNumber int) {
-	//TODO implement me
-	panic("implement me")
+func (c cleaningService) MakeupRoom(ctx context.Context, r domain.CleaningRequest) error {
+	return c.publisher.Publish(ctx, domain.RabbitMqMessage{
+		Exchange:    "ex.makeupRoom",
+		Key:         strconv.Itoa(r.RoomNumber),
+		ContentType: "application/json",
+		Body:        nil,
+	})
 }
