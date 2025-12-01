@@ -44,7 +44,7 @@ func (g guestHandler) GetGuest(c *gin.Context) {
 }
 
 func (g guestHandler) AddGuest(c *gin.Context) {
-	var guest domain.Guest
+	var guest GuestDTO
 
 	if err := c.ShouldBindJSON(&guest); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
@@ -62,7 +62,7 @@ func (g guestHandler) AddGuest(c *gin.Context) {
 }
 
 func (g guestHandler) UpdateGuest(c *gin.Context) {
-	var updatedGuest domain.Guest
+	var updatedGuest GuestDTO
 	var guestIdUri common.GuestIdURI
 
 	if err := c.ShouldBindUri(&guestIdUri); err != nil {

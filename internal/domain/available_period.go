@@ -1,28 +1,31 @@
 package domain
 
 import (
+	"guestManager/internal/domain/errors/appErrors"
 	"time"
 )
 
-type Period struct {
-	Start time.Time
-	End   time.Time
-}
-
 type CottageAvailablePeriod struct {
-	Name    string
-	Periods []Period
+	name    string
+	periods []Period
 }
 
-func (p *Period) Valid() bool {
-	return p.Start.Before(p.End)
+type Period struct {
+	start time.Time
+	end   time.Time
 }
 
-func (p *Period) Normalize() {
-	startOfDay := func(t time.Time) time.Time {
-		return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
+func NewPeriod(start, end time.Time) (Period, error) {
+	if start.After(end) {
+		return Period{}, &appErrors.ErrValidationConstrain{
+			Field: "start", Message: "start date must be before end date"}
 	}
 
-	p.Start = startOfDay(p.Start)
-	p.End = startOfDay(p.End.AddDate(0, 0, 1)).Add(-time.Nanosecond)
+	return Period{
+		startOfDay(start),
+		startOfDay(end.AddDate(0, 0, 1)).Add(-time.Nanosecond)}, nil
+}
+
+func startOfDay(t time.Time) time.Time {
+	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
 }

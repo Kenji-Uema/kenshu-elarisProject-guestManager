@@ -2,6 +2,7 @@ package mdb
 
 import (
 	"context"
+	"fmt"
 	"guestManager/internal/config"
 	"guestManager/internal/domain/errors/dbErrors"
 	"guestManager/internal/port"
@@ -19,13 +20,14 @@ func NewCottageRepo(db *mongo.Database, config *config.CottageCollectionConfig) 
 	return &cottageRepo{collection: db.Collection(config.Name)}
 }
 
-func (r cottageRepo) UpdateCurrentGuest(ctx context.Context, roomName string, guestId primitive.ObjectID) error {
+func (r *cottageRepo) UpdateCurrentGuest(ctx context.Context, roomName string, guestId primitive.ObjectID) error {
 	filter := bson.M{"name": roomName}
 	update := bson.M{"$set": bson.M{"current_guest": guestId}}
 
 	result, err := r.collection.UpdateOne(ctx, filter, update)
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: could not update current guest for the room, roomName=%s guestId=%s: %v",
+			dbErrors.ErrCottageRepo, roomName, guestId.Hex(), err)
 	}
 
 	if result.MatchedCount == 0 {

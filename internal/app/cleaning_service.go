@@ -4,7 +4,8 @@ import (
 	"context"
 	"guestManager/internal/domain"
 	"guestManager/internal/port"
-	"strconv"
+
+	"github.com/bytedance/gopkg/util/logger"
 )
 
 type CleaningService interface {
@@ -21,23 +22,22 @@ func NewCleaningService(publisher port.MqPublisher) CleaningService {
 }
 
 func (c cleaningService) CleanRoom(ctx context.Context, r domain.CleaningRequest) error {
-	if r.Request == "DO_NOT_DISTURB" {
-		return nil
+	message, err := domain.NewRabbitMqMessage(
+		"ex.cleanRoom", r.RoomName(), "application/json", nil)
+	if err != nil {
+		logger.Error("failed to create message", "error", err)
+		return err
 	}
 
-	return c.publisher.Publish(ctx, domain.RabbitMqMessage{
-		Exchange:    "ex.cleanRoom",
-		Key:         strconv.Itoa(r.RoomNumber),
-		ContentType: "application/json",
-		Body:        nil,
-	})
+	return c.publisher.Publish(ctx, message)
 }
 
 func (c cleaningService) MakeupRoom(ctx context.Context, r domain.CleaningRequest) error {
-	return c.publisher.Publish(ctx, domain.RabbitMqMessage{
-		Exchange:    "ex.makeupRoom",
-		Key:         strconv.Itoa(r.RoomNumber),
-		ContentType: "application/json",
-		Body:        nil,
-	})
+	message, err := domain.NewRabbitMqMessage(
+		"ex.makeupRoom", r.RoomName(), "application/json", nil)
+	if err != nil {
+		return err
+	}
+
+	return c.publisher.Publish(ctx, message)
 }

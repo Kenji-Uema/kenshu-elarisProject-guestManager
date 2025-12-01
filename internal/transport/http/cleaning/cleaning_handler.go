@@ -35,12 +35,15 @@ func (h cleaningHandler) CleanRoom(c *gin.Context) {
 		return
 	}
 
-	err := h.service.CleanRoom(c.Request.Context(), domain.CleaningRequest{
-		RoomNumber: roomUri.Number,
-		Request:    needCleanQuery.Clean,
-	})
+	cleaningRequest, err := domain.NewCleaningRequest(roomUri.Name, needCleanQuery.Clean)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	err = h.service.CleanRoom(c.Request.Context(), cleaningRequest)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 

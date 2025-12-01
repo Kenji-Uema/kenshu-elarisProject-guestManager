@@ -21,7 +21,7 @@ func NewGuestRepo(db *mongo.Database, config *config.GuestCollectionConfig) port
 	return &guestRepo{collection: db.Collection(config.Name)}
 }
 
-func (g guestRepo) GetById(ctx context.Context, id primitive.ObjectID) (domain.Guest, error) {
+func (g *guestRepo) GetById(ctx context.Context, id primitive.ObjectID) (domain.Guest, error) {
 	if id == primitive.NilObjectID {
 		return domain.Guest{}, errors.New("guest id is required")
 	}
@@ -35,7 +35,7 @@ func (g guestRepo) GetById(ctx context.Context, id primitive.ObjectID) (domain.G
 	return guest, nil
 }
 
-func (g guestRepo) GetByDocument(ctx context.Context, documentId string) (domain.Guest, error) {
+func (g *guestRepo) GetByDocument(ctx context.Context, documentId string) (domain.Guest, error) {
 	result := g.collection.FindOne(ctx, bson.M{"document_id": documentId})
 
 	var guest domain.Guest
@@ -45,7 +45,7 @@ func (g guestRepo) GetByDocument(ctx context.Context, documentId string) (domain
 	return guest, nil
 }
 
-func (g guestRepo) Add(ctx context.Context, newGuest domain.Guest) (primitive.ObjectID, error) {
+func (g *guestRepo) Add(ctx context.Context, newGuest domain.Guest) (primitive.ObjectID, error) {
 	result, err := g.collection.InsertOne(ctx, newGuest)
 
 	if err != nil {
@@ -56,7 +56,7 @@ func (g guestRepo) Add(ctx context.Context, newGuest domain.Guest) (primitive.Ob
 	return result.InsertedID.(primitive.ObjectID), nil
 }
 
-func (g guestRepo) Update(ctx context.Context, id primitive.ObjectID, updatedGuest domain.Guest) (domain.Guest, error) {
+func (g *guestRepo) Update(ctx context.Context, id primitive.ObjectID, updatedGuest domain.Guest) (domain.Guest, error) {
 	if id == primitive.NilObjectID {
 		return domain.Guest{}, errors.New("guest id is required for update")
 	}

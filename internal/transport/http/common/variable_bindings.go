@@ -9,7 +9,7 @@ type ReservationIdURI struct {
 }
 
 type RoomURI struct {
-	Number int `uri:"number" binding:"required"`
+	Name string `uri:"namer" binding:"required"`
 }
 
 type ItemURI struct {
