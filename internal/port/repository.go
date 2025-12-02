@@ -3,15 +3,16 @@ package port
 import (
 	"context"
 	"guestManager/internal/domain"
+	"guestManager/internal/domain/documents"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type GuestRepo interface {
-	GetById(ctx context.Context, id primitive.ObjectID) (domain.Guest, error)
-	GetByDocument(ctx context.Context, documentId string) (domain.Guest, error)
-	Add(ctx context.Context, newGuest domain.Guest) (primitive.ObjectID, error)
-	Update(ctx context.Context, id primitive.ObjectID, guest domain.Guest) (domain.Guest, error)
+	GetById(ctx context.Context, id primitive.ObjectID) (documents.Guest, error)
+	GetByDocument(ctx context.Context, documentId string) (documents.Guest, error)
+	Add(ctx context.Context, newGuest documents.Guest) (primitive.ObjectID, error)
+	Update(ctx context.Context, id primitive.ObjectID, guest documents.Guest) (documents.Guest, error)
 }
 
 type CottageRepo interface {

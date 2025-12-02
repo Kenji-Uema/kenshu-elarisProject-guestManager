@@ -1,6 +1,6 @@
-package guest
+package dto
 
-type GuestDTO struct {
+type GuestDto struct {
 	DocumentId string `json:"document_id"`
 	GivenNames string `json:"given_names"`
 	Surname    string `json:"surname"`

@@ -24,7 +24,19 @@ func NewGuestService(guestRepo port.GuestRepo) GuestService {
 }
 
 func (g guestService) GetById(ctx context.Context, id primitive.ObjectID) (domain.Guest, error) {
-	return g.repo.GetById(ctx, id)
+	guestDoc, err := g.repo.GetById(ctx, id)
+
+	if err != nil {
+		return domain.Guest{}, err
+	}
+
+	guest, err := guestDoc.ToDomain()
+
+	if err != nil {
+		return domain.Guest{}, err
+	}
+
+	return guest, nil
 }
 
 func (g guestService) GetByDocument(ctx context.Context, documentId string) (domain.Guest, error) {

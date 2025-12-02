@@ -3,6 +3,7 @@ package guest
 import (
 	"guestManager/internal/app"
 	"guestManager/internal/domain"
+	"guestManager/internal/domain/dto"
 	"guestManager/internal/transport/http/common"
 
 	"github.com/gin-gonic/gin"
@@ -39,14 +40,29 @@ func (g guestHandler) GetGuest(c *gin.Context) {
 	}
 
 	guest, err := g.service.GetById(c.Request.Context(), guestId)
+	if err != nil {
+		c.JSON(404, gin.H{"error": err.Error()})
+		return
+	}
 
-	c.JSON(200, guest)
+	c.JSON(200, guest.ToDto())
 }
 
 func (g guestHandler) AddGuest(c *gin.Context) {
-	var guest GuestDTO
+	var guestRequest dto.GuestDto
 
-	if err := c.ShouldBindJSON(&guest); err != nil {
+	if err := c.ShouldBindJSON(&guestRequest); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	guest, err := domain.NewGuest(
+		guestRequest.DocumentId,
+		guestRequest.GivenNames,
+		guestRequest.Surname,
+		guestRequest.Email,
+	)
+	if err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
@@ -62,7 +78,7 @@ func (g guestHandler) AddGuest(c *gin.Context) {
 }
 
 func (g guestHandler) UpdateGuest(c *gin.Context) {
-	var updatedGuest GuestDTO
+	var updatedRequest dto.GuestDto
 	var guestIdUri common.GuestIdURI
 
 	if err := c.ShouldBindUri(&guestIdUri); err != nil {
@@ -70,13 +86,24 @@ func (g guestHandler) UpdateGuest(c *gin.Context) {
 		return
 	}
 
-	if err := c.ShouldBindJSON(&updatedGuest); err != nil {
+	if err := c.ShouldBindJSON(&updatedRequest); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
 
 	targetGuestId, err := primitive.ObjectIDFromHex(guestIdUri.Id)
 
+	if err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	updatedGuest, err := domain.NewGuest(
+		updatedRequest.DocumentId,
+		updatedRequest.GivenNames,
+		updatedRequest.Surname,
+		updatedRequest.Email,
+	)
 	if err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
