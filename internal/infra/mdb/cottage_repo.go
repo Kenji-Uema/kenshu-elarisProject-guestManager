@@ -31,7 +31,7 @@ func (r *cottageRepo) UpdateCurrentGuest(ctx context.Context, roomName string, g
 	}
 
 	if result.MatchedCount == 0 {
-		return &dbErrors.CottageNameDoesNotExist{CottageName: roomName}
+		return &dbErrors.ErrCottageDoesNotExist{CottageName: roomName}
 	}
 
 	return nil

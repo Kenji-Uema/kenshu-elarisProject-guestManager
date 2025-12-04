@@ -3,8 +3,11 @@ package mdb
 import (
 	"context"
 	"errors"
+	"fmt"
+	"guestManager/internal/app/validation"
 	"guestManager/internal/config"
-	"guestManager/internal/domain"
+	"guestManager/internal/domain/documents"
+	"guestManager/internal/domain/errors/dbErrors"
 	"guestManager/internal/port"
 	"log/slog"
 
@@ -21,77 +24,96 @@ func NewGuestRepo(db *mongo.Database, config *config.GuestCollectionConfig) port
 	return &guestRepo{collection: db.Collection(config.Name)}
 }
 
-func (g *guestRepo) GetById(ctx context.Context, id primitive.ObjectID) (domain.Guest, error) {
-	if id == primitive.NilObjectID {
-		return domain.Guest{}, errors.New("guest id is required")
+func (g *guestRepo) GetById(ctx context.Context, id primitive.ObjectID) (documents.Guest, error) {
+	if err := validation.New().NotNilObjectID("id", id).Validate(); err != nil {
+		return documents.Guest{}, err
 	}
 
 	result := g.collection.FindOne(ctx, bson.M{"_id": id})
 
-	var guest domain.Guest
+	var guest documents.Guest
 	if err := result.Decode(&guest); err != nil {
-		return domain.Guest{}, err
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return documents.Guest{}, &dbErrors.ErrGuestDoesNotExist{Id: id}
+		}
+		return documents.Guest{}, fmt.Errorf("%w: search by Id failed; could not decode guest; guestId=%s: %v",
+			dbErrors.ErrGuestRepo, id.Hex(), err)
 	}
 	return guest, nil
 }
 
-func (g *guestRepo) GetByDocument(ctx context.Context, documentId string) (domain.Guest, error) {
+func (g *guestRepo) GetByDocument(ctx context.Context, documentId string) (documents.Guest, error) {
+	if err := validation.New().NotBlank("documentId", documentId).Validate(); err != nil {
+		return documents.Guest{}, err
+	}
+
 	result := g.collection.FindOne(ctx, bson.M{"document_id": documentId})
 
-	var guest domain.Guest
+	var guest documents.Guest
 	if err := result.Decode(&guest); err != nil {
-		return domain.Guest{}, err
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return documents.Guest{}, &dbErrors.ErrGuestDoesNotExist{DocumentId: documentId}
+		}
+		return documents.Guest{}, fmt.Errorf("%w: searchBy docoumentId failed; could not decode guest; documentId=%s: %v",
+			dbErrors.ErrGuestRepo, documentId, err)
 	}
 	return guest, nil
 }
 
-func (g *guestRepo) Add(ctx context.Context, newGuest domain.Guest) (primitive.ObjectID, error) {
+func (g *guestRepo) Add(ctx context.Context, newGuest documents.Guest) (primitive.ObjectID, error) {
+	if err := validation.New().NotZeroValue("newGuest", newGuest).Validate(); err != nil {
+		return primitive.NilObjectID, err
+	}
+
 	result, err := g.collection.InsertOne(ctx, newGuest)
 
 	if err != nil {
 		slog.Error("failed to insert guest", "error", err)
-		return primitive.NilObjectID, err
+		return primitive.NilObjectID, fmt.Errorf("%w: add new guest failed; guest=%v: %v",
+			dbErrors.ErrGuestRepo, newGuest, err)
 	}
 
 	return result.InsertedID.(primitive.ObjectID), nil
 }
 
-func (g *guestRepo) Update(ctx context.Context, id primitive.ObjectID, updatedGuest domain.Guest) (domain.Guest, error) {
-	if id == primitive.NilObjectID {
-		return domain.Guest{}, errors.New("guest id is required for update")
+func (g *guestRepo) Update(ctx context.Context, id primitive.ObjectID, updatedGuest documents.Guest) (documents.Guest, error) {
+	if err := validation.New().NotNilObjectID("id", id).NotZeroValue("updatedGuest", updatedGuest).Validate(); err != nil {
+		return documents.Guest{}, err
 	}
 
-	var existingGuest domain.Guest
-	if err := g.collection.FindOne(ctx, bson.M{"_id": id}).Decode(&existingGuest); err != nil {
-		return domain.Guest{}, err
+	filter := bson.M{"_id": id}
+
+	var existingGuest documents.Guest
+	if err := g.collection.FindOne(ctx, filter).Decode(&existingGuest); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return documents.Guest{}, &dbErrors.ErrGuestDoesNotExist{Id: id}
+		}
+		return documents.Guest{}, fmt.Errorf("%w: update guest failed; guestId=%s: %v",
+			dbErrors.ErrGuestRepo, id.Hex(), err)
 	}
 
 	updateFields := bson.M{}
 
-	if updatedGuest.DocumentId != "" && updatedGuest.DocumentId != existingGuest.DocumentId {
-		updateFields["document_id"] = updatedGuest.DocumentId
-		existingGuest.DocumentId = updatedGuest.DocumentId
-	}
-	if updatedGuest.GivenNames != "" && updatedGuest.GivenNames != existingGuest.GivenNames {
-		updateFields["given_names"] = updatedGuest.GivenNames
-		existingGuest.GivenNames = updatedGuest.GivenNames
-	}
-	if updatedGuest.Surname != "" && updatedGuest.Surname != existingGuest.Surname {
-		updateFields["surname"] = updatedGuest.Surname
-		existingGuest.Surname = updatedGuest.Surname
-	}
-	if updatedGuest.Email != "" && updatedGuest.Email != existingGuest.Email {
-		updateFields["email"] = updatedGuest.Email
-		existingGuest.Email = updatedGuest.Email
-	}
+	setStringIfChanged(updateFields, "document_id", &existingGuest.DocumentId, updatedGuest.DocumentId)
+	setStringIfChanged(updateFields, "given_names", &existingGuest.GivenNames, updatedGuest.GivenNames)
+	setStringIfChanged(updateFields, "surname", &existingGuest.Surname, updatedGuest.Surname)
+	setStringIfChanged(updateFields, "email", &existingGuest.Email, updatedGuest.Email)
 
 	if len(updateFields) == 0 {
 		return existingGuest, nil
 	}
 
-	if _, err := g.collection.UpdateOne(ctx, bson.M{"_id": id}, bson.M{"$set": updateFields}); err != nil {
-		return domain.Guest{}, err
+	if _, err := g.collection.UpdateOne(ctx, filter, bson.M{"$set": updateFields}); err != nil {
+		return documents.Guest{}, fmt.Errorf("%w: update guest failed; guestId=%s: %v",
+			dbErrors.ErrGuestRepo, id.Hex(), err)
 	}
 
 	return existingGuest, nil
+}
+
+func setStringIfChanged(m bson.M, key string, current *string, newVal string) {
+	if newVal != "" && newVal != *current {
+		m[key] = newVal
+		*current = newVal
+	}
 }
