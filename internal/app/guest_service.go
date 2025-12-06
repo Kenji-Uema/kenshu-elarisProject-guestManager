@@ -2,7 +2,10 @@ package app
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"guestManager/internal/domain"
+	"guestManager/internal/domain/errors/validationErrors"
 	"guestManager/internal/port"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -23,30 +26,68 @@ func NewGuestService(guestRepo port.GuestRepo) GuestService {
 	return &guestService{repo: guestRepo}
 }
 
-func (g guestService) GetById(ctx context.Context, id primitive.ObjectID) (domain.Guest, error) {
+func (g *guestService) GetById(ctx context.Context, id primitive.ObjectID) (domain.Guest, error) {
 	guestDoc, err := g.repo.GetById(ctx, id)
-
 	if err != nil {
 		return domain.Guest{}, err
 	}
 
-	guest, err := guestDoc.ToDomain()
-
+	guest, err := domain.NewGuest(guestDoc.Id, guestDoc.DocumentId, guestDoc.GivenNames, guestDoc.Surname, guestDoc.Email)
 	if err != nil {
-		return domain.Guest{}, err
+		// e.g. mapping/validation error
+		var validationErr *validationErrors.ErrValidationConstrain
+		if errors.As(err, &validationErr) {
+			return domain.Guest{}, err // already a typed error, just bubble up
+		}
+
+		return domain.Guest{}, fmt.Errorf("guestService.GetById(%s): mapping to domain: %w", id.Hex(), err)
 	}
 
 	return guest, nil
 }
 
-func (g guestService) GetByDocument(ctx context.Context, documentId string) (domain.Guest, error) {
-	return g.repo.GetByDocument(ctx, documentId)
+func (g *guestService) GetByDocument(ctx context.Context, documentId string) (domain.Guest, error) {
+	guestDoc, err := g.repo.GetByDocument(ctx, documentId)
+	if err != nil {
+		return domain.Guest{}, err
+	}
+
+	guest, err := domain.NewGuest(guestDoc.Id, guestDoc.DocumentId, guestDoc.GivenNames, guestDoc.Surname, guestDoc.Email)
+	if err != nil {
+		// e.g. mapping/validation error
+		var validationErr *validationErrors.ErrValidationConstrain
+		if errors.As(err, &validationErr) {
+			return domain.Guest{}, err // already a typed error, just bubble up
+		}
+
+		return domain.Guest{}, fmt.Errorf("guestService.GetByDocument(%s): mapping to domain: %w", documentId, err)
+	}
+
+	return guest, nil
+
 }
 
-func (g guestService) Add(ctx context.Context, guest domain.Guest) (primitive.ObjectID, error) {
-	return g.repo.Add(ctx, guest)
+func (g *guestService) Add(ctx context.Context, guest domain.Guest) (primitive.ObjectID, error) {
+	return g.repo.Add(ctx, guest.ToMongoDoc())
 }
 
-func (g guestService) Update(ctx context.Context, id primitive.ObjectID, guest domain.Guest) (domain.Guest, error) {
-	return g.repo.Update(ctx, id, guest)
+func (g *guestService) Update(ctx context.Context, id primitive.ObjectID, guest domain.Guest) (domain.Guest, error) {
+	updatedGuestDoc, err := g.repo.Update(ctx, id, guest.ToMongoDoc())
+	if err != nil {
+		return domain.Guest{}, err
+	}
+
+	updatedGuest, err := domain.NewGuest(updatedGuestDoc.Id, updatedGuestDoc.DocumentId, updatedGuestDoc.GivenNames,
+		updatedGuestDoc.Surname, updatedGuestDoc.Email)
+	if err != nil {
+		// e.g. mapping/validation error
+		var validationErr *validationErrors.ErrValidationConstrain
+		if errors.As(err, &validationErr) {
+			return domain.Guest{}, err // already a typed error, just bubble up
+		}
+
+		return domain.Guest{}, fmt.Errorf("guestService.GetById(%s): mapping to domain: %w", id.Hex(), err)
+	}
+
+	return updatedGuest, nil
 }

@@ -1,7 +1,7 @@
 package domain
 
 import (
-	"guestManager/internal/domain/errors/appErrors"
+	"guestManager/internal/app/validation"
 	"time"
 )
 
@@ -16,9 +16,8 @@ type Period struct {
 }
 
 func NewPeriod(start, end time.Time) (Period, error) {
-	if start.After(end) {
-		return Period{}, &appErrors.ErrValidationConstrain{
-			Field: "start", Message: "start date must be before end date"}
+	if err := validation.New().Period(start, end).Validate(); err != nil {
+		return Period{}, err
 	}
 
 	return Period{

@@ -3,8 +3,9 @@ package mdb
 import (
 	"context"
 	"fmt"
+	"guestManager/internal/app/validation"
 	"guestManager/internal/config"
-	"guestManager/internal/domain"
+	"guestManager/internal/domain/documents"
 	"guestManager/internal/domain/errors/dbErrors"
 	"guestManager/internal/port"
 
@@ -21,7 +22,11 @@ func NewBookingRepo(db *mongo.Database, config *config.BookingCollectionConfig) 
 	return &bookingRepo{collection: db.Collection(config.Name)}
 }
 
-func (b *bookingRepo) FindByGuestId(ctx context.Context, guestId primitive.ObjectID) ([]domain.Booking, error) {
+func (b *bookingRepo) FindByGuestId(ctx context.Context, guestId primitive.ObjectID) ([]documents.Booking, error) {
+	if err := validation.New().NotNilObjectID("guestId", guestId).Validate(); err != nil {
+		return nil, err
+	}
+
 	cursor, err := b.collection.Find(ctx, bson.M{"main_guest": guestId})
 	if err != nil {
 		return nil, fmt.Errorf("%w: could not find bookings for guestId=%s: %v",
@@ -31,7 +36,7 @@ func (b *bookingRepo) FindByGuestId(ctx context.Context, guestId primitive.Objec
 	//goland:noinspection GoUnhandledErrorResult
 	defer cursor.Close(ctx)
 
-	var bookings = make([]domain.Booking, 0)
+	var bookings = make([]documents.Booking, 0)
 	if err := cursor.All(ctx, &bookings); err != nil {
 		return nil, fmt.Errorf("%w: could not find bookings for guestId=%s: %v",
 			dbErrors.ErrBookingRepo, guestId.Hex(), err)

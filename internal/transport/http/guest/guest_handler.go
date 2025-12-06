@@ -57,6 +57,7 @@ func (g guestHandler) AddGuest(c *gin.Context) {
 	}
 
 	guest, err := domain.NewGuest(
+		primitive.NewObjectID(),
 		guestRequest.DocumentId,
 		guestRequest.GivenNames,
 		guestRequest.Surname,
@@ -99,6 +100,7 @@ func (g guestHandler) UpdateGuest(c *gin.Context) {
 	}
 
 	updatedGuest, err := domain.NewGuest(
+		primitive.NewObjectID(),
 		updatedRequest.DocumentId,
 		updatedRequest.GivenNames,
 		updatedRequest.Surname,

@@ -27,12 +27,12 @@ func (p *publisher) Publish(ctx context.Context, message domain.RabbitMqMessage)
 	confirmations := p.channel.NotifyPublish(make(chan amqp.Confirmation, 1))
 
 	err := p.channel.PublishWithContext(ctx,
-		message.Exchange,
-		message.Key,
+		message.Exchange(),
+		message.Key(),
 		false, false,
 		amqp.Publishing{
-			ContentType:  message.ContentType,
-			Body:         message.Body,
+			ContentType:  message.ContentType(),
+			Body:         message.Body(),
 			DeliveryMode: amqp.Persistent,
 			Timestamp:    time.Now(),
 		},

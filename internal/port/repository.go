@@ -2,7 +2,6 @@ package port
 
 import (
 	"context"
-	"guestManager/internal/domain"
 	"guestManager/internal/domain/documents"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -20,5 +19,5 @@ type CottageRepo interface {
 }
 
 type BookingRepo interface {
-	FindByGuestId(ctx context.Context, guestId primitive.ObjectID) ([]domain.Booking, error)
+	FindByGuestId(ctx context.Context, guestId primitive.ObjectID) ([]documents.Booking, error)
 }

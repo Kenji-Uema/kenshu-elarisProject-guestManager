@@ -1,7 +1,7 @@
 package domain
 
 import (
-	"guestManager/internal/domain/errors/appErrors"
+	"guestManager/internal/app/validation"
 	"strings"
 )
 
@@ -11,18 +11,8 @@ type CleaningRequest struct {
 }
 
 func NewCleaningRequest(roomName, request string) (CleaningRequest, error) {
-	if strings.TrimSpace(roomName) == "" {
-		return CleaningRequest{}, &appErrors.ErrValidationConstrain{
-			Field:   "roomName",
-			Message: "must not be empty",
-		}
-	}
-
-	if request != "DO_NOT_DISTURB" && request != "CLEAN" {
-		return CleaningRequest{}, &appErrors.ErrValidationConstrain{
-			Field:   "request",
-			Message: "must be either DO_NOT_DISTURB or CLEAN",
-		}
+	if err := validation.New().NotBlank("roomName", roomName).CleaningRequest(request).Validate(); err != nil {
+		return CleaningRequest{}, err
 	}
 
 	return CleaningRequest{roomName, request}, nil

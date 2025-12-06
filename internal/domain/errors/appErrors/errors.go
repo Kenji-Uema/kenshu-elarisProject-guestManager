@@ -1,12 +1,20 @@
 package appErrors
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
 
-type ErrValidationConstrain struct {
-	Field   string
-	Message string
+	"go.mongodb.org/mongo-driver/bson/primitive"
+)
+
+type ErrGuestNotFound struct {
+	Id         primitive.ObjectID
+	DocumentId string
 }
 
-func (e *ErrValidationConstrain) Error() string {
-	return fmt.Sprintf("%s has violations; %s", e.Field, e.Message)
+func (e *ErrGuestNotFound) Error() string {
+	if strings.TrimSpace(e.DocumentId) != "" {
+		return fmt.Sprintf("Guest with document id %s does not exist", e.DocumentId)
+	}
+	return fmt.Sprintf("Guest with id %s does not exist", e.Id.Hex())
 }

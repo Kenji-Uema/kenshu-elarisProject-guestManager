@@ -1,0 +1,27 @@
+package validation
+
+import (
+	"guestManager/internal/domain/errors/validationErrors"
+	"reflect"
+	"strings"
+)
+
+func (v *Validator) NotBlank(field, value string) *Validator {
+	v.steps = append(v.steps, func() error {
+		if strings.TrimSpace(value) == "" {
+			return &validationErrors.ErrValidationConstrain{Field: field, Message: "must not be blank"}
+		}
+		return nil
+	})
+	return v
+}
+
+func (v *Validator) NotZeroValue(field string, value any) *Validator {
+	v.steps = append(v.steps, func() error {
+		if reflect.ValueOf(value).IsZero() {
+			return &validationErrors.ErrValidationConstrain{Field: field, Message: "must not be zero value"}
+		}
+		return nil
+	})
+	return v
+}

@@ -3,6 +3,7 @@ package mdb
 import (
 	"context"
 	"fmt"
+	"guestManager/internal/app/validation"
 	"guestManager/internal/config"
 	"guestManager/internal/domain/errors/dbErrors"
 	"guestManager/internal/port"
@@ -21,6 +22,10 @@ func NewCottageRepo(db *mongo.Database, config *config.CottageCollectionConfig) 
 }
 
 func (r *cottageRepo) UpdateCurrentGuest(ctx context.Context, roomName string, guestId primitive.ObjectID) error {
+	if err := validation.New().NotBlank("roomName", roomName).NotNilObjectID("guestId", guestId).Validate(); err != nil {
+		return err
+	}
+
 	filter := bson.M{"name": roomName}
 	update := bson.M{"$set": bson.M{"current_guest": guestId}}
 
