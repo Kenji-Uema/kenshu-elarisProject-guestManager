@@ -1,0 +1,44 @@
+[
+    {
+        "Id": "86a7d3bb21169a393dd1db1b",
+        "Name": "Rose",
+        "View": "Luxury",
+        "Details": {
+            "Description":"Sea view",
+            "View": "Sea",
+            "FurnitureDescription": "Modern",
+            "BathroomDescription": "Marble",
+            "AmenitiesDescription": "Spa, Pool"
+        },
+        "Photos": ["p1.jpg", "p2.jpg"],
+        "PricePerNight": 200.0,
+        "Bookings": ["86a7d3bb21169a393dd1db1b", "b5fa4aefa370638801dbe2af", "40583ce2a1791c22e68e957c"],
+        "CurrentlyOccupied": false
+    },
+    {
+        "Id": "86a7d3bb21169a393dd1db1c",
+        "Name": "Lily",
+        "View": "Standard",
+        "Details": {
+            "Description": "Garden view",
+            "View": "Garden"
+        },
+        "Photos": ["p3.jpg"],
+        "PricePerNight": 120.0,
+        "Bookings": ["c3256a49188aedb29439b86e"],
+        "CurrentlyOccupied": false
+    },
+    {
+        "Id": "86a7d3bb21169a393dd1d111",
+        "Name": "Daisy",
+        "View": "Luxury",
+        "Details": {
+            "Description": "Forest edge",
+            "View": "Forest"
+        },
+        "Photos": ["p4.jpg"],
+        "PricePerNight": 180.0,
+        "Bookings": [],
+        "CurrentlyOccupied": true
+    }
+]

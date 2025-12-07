@@ -1,0 +1,46 @@
+[
+    {
+        "Id": "86a7d3bb21169a393dd1db1b",
+        "MainGuest": "1264dbc45e52ba18f937049f",
+        "NumberOfGuests": 2,
+        "StayPeriod": {
+            "Start": "2025-10-01T12:30:00Z",
+            "End": "2025-10-05T12:30:00Z"
+        },
+        "CottageId": "8c6c19d1ca50ea6f5887a390",
+        "Status": "Confirmed"
+    },
+    {
+        "Id": "b5fa4aefa370638801dbe2af",
+        "MainGuest": "43a6382a4d9cd1d0f8b59edf",
+        "NumberOfGuests": 2,
+        "StayPeriod": {
+            "Start": "2025-11-07T12:30:00Z",
+            "End": "2025-11-19T12:30:00Z"
+        },
+        "CottageId": "73f4269da90ae6641226db5c",
+        "Status": "Confirmed"
+    },
+    {
+        "Id": "c3256a49188aedb29439b86e",
+        "MainGuest": "848a39b07883ab18d6cf89e9",
+        "NumberOfGuests": 2,
+        "StayPeriod": {
+            "Start": "2025-12-05T12:30:00Z",
+            "End": "2025-12-10T12:30:00Z"
+        },
+        "CottageId": "f99a409438b540f5b139f6b5",
+        "Status": "Confirmed"
+    },
+    {
+        "Id": "40583ce2a1791c22e68e957c",
+        "MainGuest": "0afbd5dec696af61e04b5afc",
+        "NumberOfGuests": 2,
+        "StayPeriod": {
+            "Start": "2025-12-28T12:30:00Z",
+            "End": "2026-01-05T12:30:00Z"
+        },
+        "CottageId": "cb8dccbe87dbe86a35a4f8b0",
+        "Status": "Confirmed"
+    }
+]
