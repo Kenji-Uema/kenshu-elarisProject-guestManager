@@ -3,7 +3,6 @@ package mdb
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"time"
 
 	"go.mongodb.org/mongo-driver/mongo"
@@ -52,18 +51,4 @@ func (d *Db) Ping(ctx context.Context) error {
 	defer cancel()
 
 	return d.Client.Ping(ctx, readpref.Primary())
-}
-
-func (d *Db) DropAll(ctx context.Context) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	err := d.Database.Drop(ctx)
-
-	if err != nil {
-		slog.Error("failed to drop database", "error", err)
-		return
-	}
-
-	slog.Info("database dropped successfully")
 }
