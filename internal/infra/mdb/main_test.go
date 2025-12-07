@@ -2,8 +2,7 @@ package mdb
 
 import (
 	"context"
-	"encoding/json"
-	"guestManager/internal/domain"
+	"guestManager/internal/domain/documents"
 	"log"
 	"os"
 	"testing"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/mongodb"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -53,16 +53,16 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func setupAndRun(testName string, t *testing.T, test func(t *testing.T, ct *mongo.Collection, br *mongo.Collection)) {
+func setupAndRun(testName string, t *testing.T, test func(t *testing.T, ct *mongo.Collection, br *mongo.Collection, gr *mongo.Collection)) {
 	db := mongoClient.Database("test_db")
 
 	cottageCollection := db.Collection("Cottage")
 	bookingCollection := db.Collection("Booking")
 	guestCollection := db.Collection("Guest")
 
-	seed[domain.Cottage](t, cottageCollection, "../../test_data/cottages_fixture.json")
-	seed[domain.Booking](t, bookingCollection, "../../test_data/bookings_fixture.json")
-	seed[domain.Guest](t, guestCollection, "../../test_data/guests_fixture.json")
+	seed[documents.Cottage](t, cottageCollection, "../../test_data/cottages_fixture.json")
+	seed[documents.Booking](t, bookingCollection, "../../test_data/bookings_fixture.json")
+	seed[documents.Guest](t, guestCollection, "../../test_data/guests_fixture.json")
 
 	t.Cleanup(func() {
 		_ = cottageCollection.Drop(context.Background())
@@ -71,18 +71,18 @@ func setupAndRun(testName string, t *testing.T, test func(t *testing.T, ct *mong
 	})
 
 	t.Run(testName, func(t *testing.T) {
-		test(t, cottageCollection, bookingCollection)
+		test(t, cottageCollection, bookingCollection, guestCollection)
 	})
 }
 
-func seed[D domain.Booking | domain.Cottage | domain.Guest](t *testing.T, collection *mongo.Collection, filepath string) {
+func seed[D documents.Booking | documents.Cottage | documents.Guest](t *testing.T, collection *mongo.Collection, filepath string) {
 	data, err := os.ReadFile(filepath)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	var items []D
-	if err := json.Unmarshal(data, &items); err != nil {
+	if err := bson.UnmarshalExtJSON(data, false, &items); err != nil {
 		t.Fatal(err)
 	}
 
