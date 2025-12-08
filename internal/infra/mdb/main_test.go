@@ -12,12 +12,13 @@ import (
 	"github.com/testcontainers/testcontainers-go/modules/mongodb"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 var (
-	mongoC      *mongodb.MongoDBContainer
-	mongoClient *mongo.Client
+	mongoC            *mongodb.MongoDBContainer
+	bookingRepository *bookingRepo
+	cottageRepository *cottageRepo
+	guestRepository   *guestRepo
 )
 
 func TestMain(m *testing.M) {
@@ -40,25 +41,29 @@ func TestMain(m *testing.M) {
 		log.Fatalf("failed to get connection string: %v", err)
 	}
 
-	mongoClient, err = mongo.Connect(ctx, options.Client().ApplyURI(uri))
+	db, err := NewMongoDb(context.Background(), uri, "test_db")
 	if err != nil {
 		log.Fatalf("failed to connect mongo client: %v", err)
 	}
 
+	bookingRepository = &bookingRepo{collection: db.Collection("Booking")}
+	cottageRepository = &cottageRepo{collection: db.Collection("Cottage")}
+	guestRepository = &guestRepo{collection: db.Collection("Guest")}
+
 	code := m.Run()
 
-	_ = mongoClient.Disconnect(ctx)
+	if db != nil {
+		_ = db.Close(context.Background())
+	}
 	_ = testcontainers.TerminateContainer(mongoC)
 
 	os.Exit(code)
 }
 
 func setupAndRun(testName string, t *testing.T, test func(t *testing.T, ct *mongo.Collection, br *mongo.Collection, gr *mongo.Collection)) {
-	db := mongoClient.Database("test_db")
-
-	cottageCollection := db.Collection("Cottage")
-	bookingCollection := db.Collection("Booking")
-	guestCollection := db.Collection("Guest")
+	cottageCollection := cottageRepository.collection
+	bookingCollection := bookingRepository.collection
+	guestCollection := guestRepository.collection
 
 	seed[documents.Cottage](t, cottageCollection, "../../test_data/cottages_fixture.json")
 	seed[documents.Booking](t, bookingCollection, "../../test_data/bookings_fixture.json")

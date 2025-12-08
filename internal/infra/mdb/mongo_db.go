@@ -45,10 +45,3 @@ func (d *Db) Close(ctx context.Context) error {
 func (d *Db) Collection(name string) *mongo.Collection {
 	return d.Database.Collection(name)
 }
-
-func (d *Db) Ping(ctx context.Context) error {
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
-	defer cancel()
-
-	return d.Client.Ping(ctx, readpref.Primary())
-}
