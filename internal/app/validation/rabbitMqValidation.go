@@ -12,7 +12,7 @@ var allowedContentTypes = []string{"application/json"}
 
 func (v *Validator) ExchangeName(name string) *Validator {
 	v.steps = append(v.steps, func() error {
-		if exchangeNameRe.MatchString(name) {
+		if !exchangeNameRe.MatchString(name) {
 			return &validationErrors.ErrValidationConstrain{
 				Field:   "exchangeName",
 				Message: "must be in format ex.<name of exchange>",

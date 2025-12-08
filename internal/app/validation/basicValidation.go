@@ -25,3 +25,14 @@ func (v *Validator) NotZeroValue(field string, value any) *Validator {
 	})
 	return v
 }
+
+func (v *Validator) PositiveValue(field string, value int) *Validator {
+	v.steps = append(v.steps, func() error {
+		if value <= 0 {
+			return &validationErrors.ErrValidationConstrain{Field: field, Message: "must be greater than 0"}
+		}
+		return nil
+	})
+
+	return v
+}

@@ -36,20 +36,9 @@ func (v *Validator) CleaningRequest(request string) *Validator {
 	return v
 }
 
-func (v *Validator) PositiveValue(field string, value int) *Validator {
-	v.steps = append(v.steps, func() error {
-		if value <= 0 {
-			return &validationErrors.ErrValidationConstrain{Field: field, Message: "must be greater than 0"}
-		}
-		return nil
-	})
-
-	return v
-}
-
 func (v *Validator) Period(start time.Time, end time.Time) *Validator {
 	v.steps = append(v.steps, func() error {
-		if start.After(end) {
+		if start.After(end) || start.Equal(end) {
 			return &validationErrors.ErrValidationConstrain{
 				Field: "start", Message: "start date must be before end date"}
 		}
