@@ -11,12 +11,12 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/go.mongodb.org/mongo-driver/mongo/otelmongo"
 )
 
-type Db struct {
-	Client   *mongo.Client
-	Database *mongo.Database
+type Mdb struct {
+	client   *mongo.Client
+	database *mongo.Database
 }
 
-func NewMongoDb(connectionContext context.Context, uri, dbName string) (*Db, error) {
+func NewMongoDb(connectionContext context.Context, uri, dbName string) (*Mdb, error) {
 	connectionContext, connectionCancel := context.WithTimeout(connectionContext, 10*time.Second)
 	defer connectionCancel()
 
@@ -35,13 +35,13 @@ func NewMongoDb(connectionContext context.Context, uri, dbName string) (*Db, err
 		return nil, fmt.Errorf("mongo ping failed for URI: %s, error: %w", uri, err)
 	}
 
-	return &Db{Client: client, Database: client.Database(dbName)}, nil
+	return &Mdb{client: client, database: client.Database(dbName)}, nil
 }
 
-func (d *Db) Close(ctx context.Context) error {
-	return d.Client.Disconnect(ctx)
+func (d *Mdb) Close(ctx context.Context) error {
+	return d.client.Disconnect(ctx)
 }
 
-func (d *Db) Collection(name string) *mongo.Collection {
-	return d.Database.Collection(name)
+func (d *Mdb) Collection(name string) *mongo.Collection {
+	return d.database.Collection(name)
 }

@@ -15,8 +15,7 @@ type MongoDbConfig struct {
 }
 
 type RabbitMqConfig struct {
-	Url            string `env:"RABBITMQ_URL,required"`
-	ConfirmNotWait bool   `env:"RABBITMQ_CONFIRM_NOT_WAIT" envDefault:"false"`
+	Url string `env:"RABBITMQ_URL,required"`
 }
 
 type GuestCollectionConfig struct {
@@ -32,12 +31,13 @@ type BookingCollectionConfig struct {
 }
 
 type CleaningExchangeConfig struct {
-	Name       string `env:"CLEANING_EXCHANGE" envDefault:"cleaning.room-makeup"`
-	Kind       string `env:"CLEANING_EXCHANGE_KIND" envDefault:"direct"`
-	Durable    bool   `env:"CLEANING_EXCHANGE_DURABLE" envDefault:"true"`
-	AutoDelete bool   `env:"CLEANING_EXCHANGE_AUTO_DELETE" envDefault:"false"`
-	Internal   bool   `env:"CLEANING_EXCHANGE_INTERNAL" envDefault:"false"`
-	NoWait     bool   `env:"CLEANING_EXCHANGE_NO_WAIT" envDefault:"false"`
+	Name           string `env:"CLEANING_EXCHANGE" envDefault:"ex.cleaning"`
+	Kind           string `env:"CLEANING_EXCHANGE_KIND" envDefault:"direct"`
+	Durable        bool   `env:"CLEANING_EXCHANGE_DURABLE" envDefault:"true"`
+	AutoDelete     bool   `env:"CLEANING_EXCHANGE_AUTO_DELETE" envDefault:"false"`
+	Internal       bool   `env:"CLEANING_EXCHANGE_INTERNAL" envDefault:"false"`
+	NoWait         bool   `env:"CLEANING_EXCHANGE_NO_WAIT" envDefault:"false"`
+	ConfirmNotWait bool   `env:"RABBITMQ_CONFIRM_NOT_WAIT" envDefault:"false"`
 }
 
 func LoadConfig[C MongoDbConfig | GuestCollectionConfig | CottageCollectionConfig |
