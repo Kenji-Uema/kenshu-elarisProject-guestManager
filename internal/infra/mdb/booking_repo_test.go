@@ -3,12 +3,13 @@ package mdb
 import (
 	"context"
 	"errors"
-	"guestManager/internal/domain/errors/validationErrors"
 	"testing"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"github.com/Kenji-Uema/guestManager/internal/domain/errors/validationErrors"
+	"go.mongodb.org/mongo-driver/v2/bson"
+
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 func Test_bookingRepo_FindByGuestId_ReturnsBookings(t *testing.T) {
@@ -16,7 +17,7 @@ func Test_bookingRepo_FindByGuestId_ReturnsBookings(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
 
-		guestID, err := primitive.ObjectIDFromHex("64b6f7c2c0f1e84c0a1a9c01")
+		guestID, err := bson.ObjectIDFromHex("64b6f7c2c0f1e84c0a1a9c01")
 		if err != nil {
 			t.Fatalf("failed to parse hex id: %v", err)
 		}
@@ -42,7 +43,7 @@ func Test_bookingRepo_FindByGuestId_ReturnsEmptyWhenNone(t *testing.T) {
 		defer cancel()
 
 		r := &bookingRepo{collection: br}
-		bookings, err := r.FindByGuestId(ctx, primitive.NewObjectID())
+		bookings, err := r.FindByGuestId(ctx, bson.NewObjectID())
 		if err != nil {
 			t.Fatalf("FindByGuestId() unexpected error: %v", err)
 		}
@@ -58,7 +59,7 @@ func Test_bookingRepo_FindByGuestId_ValidatesInput(t *testing.T) {
 		defer cancel()
 
 		r := &bookingRepo{collection: br}
-		_, err := r.FindByGuestId(ctx, primitive.NilObjectID)
+		_, err := r.FindByGuestId(ctx, bson.NilObjectID)
 
 		var validationErr *validationErrors.ErrValidationConstrain
 		if !errors.As(err, &validationErr) {

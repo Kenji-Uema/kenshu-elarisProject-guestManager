@@ -1,13 +1,13 @@
 package guest
 
 import (
-	"guestManager/internal/app"
-	"guestManager/internal/domain"
-	"guestManager/internal/domain/dto"
-	"guestManager/internal/transport/http/common"
+	"github.com/Kenji-Uema/guestManager/internal/app"
+	"github.com/Kenji-Uema/guestManager/internal/domain"
+	"github.com/Kenji-Uema/guestManager/internal/domain/dto"
+	"github.com/Kenji-Uema/guestManager/internal/transport/http/common"
+	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"github.com/gin-gonic/gin"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type Handler interface {
@@ -32,7 +32,7 @@ func (g guestHandler) GetGuest(c *gin.Context) {
 		return
 	}
 
-	guestId, err := primitive.ObjectIDFromHex(guestIdUri.Id)
+	guestId, err := bson.ObjectIDFromHex(guestIdUri.Id)
 
 	if err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
@@ -57,7 +57,7 @@ func (g guestHandler) AddGuest(c *gin.Context) {
 	}
 
 	guest, err := domain.NewGuest(
-		primitive.NewObjectID(),
+		bson.NewObjectID(),
 		guestRequest.DocumentId,
 		guestRequest.GivenNames,
 		guestRequest.Surname,
@@ -92,7 +92,7 @@ func (g guestHandler) UpdateGuest(c *gin.Context) {
 		return
 	}
 
-	targetGuestId, err := primitive.ObjectIDFromHex(guestIdUri.Id)
+	targetGuestId, err := bson.ObjectIDFromHex(guestIdUri.Id)
 
 	if err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
@@ -100,7 +100,7 @@ func (g guestHandler) UpdateGuest(c *gin.Context) {
 	}
 
 	updatedGuest, err := domain.NewGuest(
-		primitive.NewObjectID(),
+		bson.NewObjectID(),
 		updatedRequest.DocumentId,
 		updatedRequest.GivenNames,
 		updatedRequest.Surname,

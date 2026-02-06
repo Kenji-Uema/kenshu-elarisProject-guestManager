@@ -4,16 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"guestManager/internal/app/validation"
-	"guestManager/internal/config"
-	"guestManager/internal/domain/documents"
-	"guestManager/internal/domain/errors/dbErrors"
-	"guestManager/internal/port"
 	"log/slog"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"github.com/Kenji-Uema/guestManager/internal/app/validation"
+	"github.com/Kenji-Uema/guestManager/internal/config"
+	"github.com/Kenji-Uema/guestManager/internal/domain/documents"
+	"github.com/Kenji-Uema/guestManager/internal/domain/errors/dbErrors"
+	"github.com/Kenji-Uema/guestManager/internal/port"
+
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 type guestRepo struct {
@@ -24,7 +24,7 @@ func NewGuestRepo(db *mongo.Database, config *config.GuestCollectionConfig) port
 	return &guestRepo{collection: db.Collection(config.Name)}
 }
 
-func (g *guestRepo) GetById(ctx context.Context, id primitive.ObjectID) (documents.Guest, error) {
+func (g *guestRepo) GetById(ctx context.Context, id bson.ObjectID) (documents.Guest, error) {
 	if err := validation.New().NotNilObjectID("id", id).Validate(); err != nil {
 		return documents.Guest{}, err
 	}
@@ -60,23 +60,23 @@ func (g *guestRepo) GetByDocument(ctx context.Context, documentId string) (docum
 	return guest, nil
 }
 
-func (g *guestRepo) Add(ctx context.Context, newGuest documents.Guest) (primitive.ObjectID, error) {
+func (g *guestRepo) Add(ctx context.Context, newGuest documents.Guest) (bson.ObjectID, error) {
 	if err := validation.New().NotZeroValue("newGuest", newGuest).Validate(); err != nil {
-		return primitive.NilObjectID, err
+		return bson.NilObjectID, err
 	}
 
 	result, err := g.collection.InsertOne(ctx, newGuest)
 
 	if err != nil {
 		slog.Error("failed to insert guest", "error", err)
-		return primitive.NilObjectID, fmt.Errorf("%w: add new guest failed; guest=%v: %v",
+		return bson.NilObjectID, fmt.Errorf("%w: add new guest failed; guest=%v: %v",
 			dbErrors.ErrGuestRepo, newGuest, err)
 	}
 
-	return result.InsertedID.(primitive.ObjectID), nil
+	return result.InsertedID.(bson.ObjectID), nil
 }
 
-func (g *guestRepo) Update(ctx context.Context, id primitive.ObjectID, updatedGuest documents.Guest) (documents.Guest, error) {
+func (g *guestRepo) Update(ctx context.Context, id bson.ObjectID, updatedGuest documents.Guest) (documents.Guest, error) {
 	if err := validation.New().NotNilObjectID("id", id).NotZeroValue("updatedGuest", updatedGuest).Validate(); err != nil {
 		return documents.Guest{}, err
 	}

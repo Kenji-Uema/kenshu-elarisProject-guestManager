@@ -1,9 +1,10 @@
 package validation
 
 import (
-	"guestManager/internal/domain/errors/validationErrors"
 	"reflect"
 	"strings"
+
+	"github.com/Kenji-Uema/guestManager/internal/domain/errors/validationErrors"
 )
 
 func (v *Validator) NotBlank(field, value string) *Validator {

@@ -2,7 +2,8 @@ package mq
 
 import (
 	"fmt"
-	"guestManager/internal/config"
+
+	"github.com/Kenji-Uema/guestManager/internal/config"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )

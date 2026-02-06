@@ -5,10 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/mongo/readpref"
-	"go.opentelemetry.io/contrib/instrumentation/go.mongodb.org/mongo-driver/mongo/otelmongo"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/mongo/readpref"
 )
 
 type Mdb struct {
@@ -17,11 +16,10 @@ type Mdb struct {
 }
 
 func NewMongoDb(connectionContext context.Context, uri, dbName string) (*Mdb, error) {
-	connectionContext, connectionCancel := context.WithTimeout(connectionContext, 10*time.Second)
-	defer connectionCancel()
-
-	clientOptions := options.Client().ApplyURI(uri).SetMonitor(otelmongo.NewMonitor())
-	client, err := mongo.Connect(connectionContext, clientOptions)
+	clientOptions := options.Client().
+		ApplyURI(uri).
+		SetConnectTimeout(10 * time.Second)
+	client, err := mongo.Connect(clientOptions)
 
 	if err != nil {
 		return nil, err

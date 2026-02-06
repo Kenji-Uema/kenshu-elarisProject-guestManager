@@ -1,18 +1,18 @@
 package domain
 
 import (
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 type Cottage struct {
-	Id            primitive.ObjectID
+	Id            bson.ObjectID
 	Name          string
 	View          string
 	Details       CottageDetails
 	Photos        []string
 	PricePerNight float32
-	Bookings      []primitive.ObjectID
-	CurrentGuest  primitive.ObjectID
+	Bookings      []bson.ObjectID
+	CurrentGuest  bson.ObjectID
 }
 
 type CottageDetails struct {

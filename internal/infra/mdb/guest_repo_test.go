@@ -3,14 +3,15 @@ package mdb
 import (
 	"context"
 	"errors"
-	"guestManager/internal/domain/documents"
-	"guestManager/internal/domain/errors/dbErrors"
-	"guestManager/internal/domain/errors/validationErrors"
 	"testing"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"github.com/Kenji-Uema/guestManager/internal/domain/documents"
+	"github.com/Kenji-Uema/guestManager/internal/domain/errors/dbErrors"
+	"github.com/Kenji-Uema/guestManager/internal/domain/errors/validationErrors"
+	"go.mongodb.org/mongo-driver/v2/bson"
+
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 func Test_guestRepo_GetById_NotFound(t *testing.T) {
@@ -19,7 +20,7 @@ func Test_guestRepo_GetById_NotFound(t *testing.T) {
 		defer cancel()
 
 		r := &guestRepo{collection: gr}
-		_, err := r.GetById(ctx, primitive.NewObjectID())
+		_, err := r.GetById(ctx, bson.NewObjectID())
 
 		var errGuestNotFound *dbErrors.ErrGuestDoesNotExist
 		if !errors.As(err, &errGuestNotFound) {
@@ -34,7 +35,7 @@ func Test_guestRepo_GetById_ValidatesId(t *testing.T) {
 		defer cancel()
 
 		r := &guestRepo{collection: gr}
-		_, err := r.GetById(ctx, primitive.NilObjectID)
+		_, err := r.GetById(ctx, bson.NilObjectID)
 
 		var validationErr *validationErrors.ErrValidationConstrain
 		if !errors.As(err, &validationErr) {
@@ -48,7 +49,7 @@ func Test_guestRepo_GetById_ReturnsGuest(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
 
-		id, err := primitive.ObjectIDFromHex("64b6f7c2c0f1e84c0a1a9c01")
+		id, err := bson.ObjectIDFromHex("64b6f7c2c0f1e84c0a1a9c01")
 		if err != nil {
 			t.Fatalf("failed to parse hex id: %v", err)
 		}
@@ -129,7 +130,7 @@ func Test_guestRepo_Add_InsertsGuest(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Add() unexpected error: %v", err)
 		}
-		if insertedID == primitive.NilObjectID {
+		if insertedID == bson.NilObjectID {
 			t.Fatalf("Add() returned nil object ID")
 		}
 
@@ -164,7 +165,7 @@ func Test_guestRepo_Update_UpdatesFields(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
 
-		id, err := primitive.ObjectIDFromHex("64b6f7c2c0f1e84c0a1a9c02")
+		id, err := bson.ObjectIDFromHex("64b6f7c2c0f1e84c0a1a9c02")
 		if err != nil {
 			t.Fatalf("failed to parse hex id: %v", err)
 		}
@@ -209,7 +210,7 @@ func Test_guestRepo_Update_NotFound(t *testing.T) {
 			Email:      "ghost.person@example.com",
 		}
 
-		_, err := r.Update(ctx, primitive.NewObjectID(), updatedGuest)
+		_, err := r.Update(ctx, bson.NewObjectID(), updatedGuest)
 
 		var errGuestNotFound *dbErrors.ErrGuestDoesNotExist
 		if !errors.As(err, &errGuestNotFound) {
@@ -223,7 +224,7 @@ func Test_guestRepo_Update_NoChanges(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
 
-		id, err := primitive.ObjectIDFromHex("64b6f7c2c0f1e84c0a1a9c03")
+		id, err := bson.ObjectIDFromHex("64b6f7c2c0f1e84c0a1a9c03")
 		if err != nil {
 			t.Fatalf("failed to parse hex id: %v", err)
 		}
@@ -254,7 +255,7 @@ func Test_guestRepo_Update_ValidatesInput(t *testing.T) {
 
 		r := &guestRepo{collection: gr}
 
-		_, err := r.Update(ctx, primitive.NilObjectID, documents.Guest{})
+		_, err := r.Update(ctx, bson.NilObjectID, documents.Guest{})
 		var validationErr *validationErrors.ErrValidationConstrain
 		if !errors.As(err, &validationErr) {
 			t.Fatalf("Update() expected validation error for id and guest, got %v", err)

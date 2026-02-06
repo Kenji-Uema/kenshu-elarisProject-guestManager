@@ -3,15 +3,14 @@ package mdb
 import (
 	"context"
 	"fmt"
-	"guestManager/internal/app/validation"
-	"guestManager/internal/config"
-	"guestManager/internal/domain/documents"
-	"guestManager/internal/domain/errors/dbErrors"
-	"guestManager/internal/port"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"github.com/Kenji-Uema/guestManager/internal/app/validation"
+	"github.com/Kenji-Uema/guestManager/internal/config"
+	"github.com/Kenji-Uema/guestManager/internal/domain/documents"
+	"github.com/Kenji-Uema/guestManager/internal/domain/errors/dbErrors"
+	"github.com/Kenji-Uema/guestManager/internal/port"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 type bookingRepo struct {
@@ -22,7 +21,7 @@ func NewBookingRepo(db *mongo.Database, config *config.BookingCollectionConfig) 
 	return &bookingRepo{collection: db.Collection(config.Name)}
 }
 
-func (b *bookingRepo) FindByGuestId(ctx context.Context, guestId primitive.ObjectID) ([]documents.Booking, error) {
+func (b *bookingRepo) FindByGuestId(ctx context.Context, guestId bson.ObjectID) ([]documents.Booking, error) {
 	if err := validation.New().NotNilObjectID("guestId", guestId).Validate(); err != nil {
 		return nil, err
 	}

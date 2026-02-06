@@ -1,16 +1,18 @@
 package documents
 
-import "go.mongodb.org/mongo-driver/bson/primitive"
+import (
+	"go.mongodb.org/mongo-driver/v2/bson"
+)
 
 type Cottage struct {
-	Id            primitive.ObjectID   `bson:"_id,omitempty"`
-	Name          string               `bson:"name"`
-	View          string               `bson:"view"`
-	Details       CottageDetails       `bson:"details"`
-	Photos        []string             `bson:"photos"`
-	PricePerNight float32              `bson:"price_per_night"`
-	Bookings      []primitive.ObjectID `bson:"bookings"`
-	CurrentGuest  primitive.ObjectID   `bson:"current_guest"`
+	Id            bson.ObjectID   `bson:"_id,omitempty"`
+	Name          string          `bson:"name"`
+	View          string          `bson:"view"`
+	Details       CottageDetails  `bson:"details"`
+	Photos        []string        `bson:"photos"`
+	PricePerNight float32         `bson:"price_per_night"`
+	Bookings      []bson.ObjectID `bson:"bookings"`
+	CurrentGuest  bson.ObjectID   `bson:"current_guest"`
 }
 
 type CottageDetails struct {

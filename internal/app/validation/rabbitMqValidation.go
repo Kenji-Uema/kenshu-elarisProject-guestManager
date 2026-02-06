@@ -2,9 +2,10 @@ package validation
 
 import (
 	"fmt"
-	"guestManager/internal/domain/errors/validationErrors"
 	"regexp"
 	"slices"
+
+	"github.com/Kenji-Uema/guestManager/internal/domain/errors/validationErrors"
 )
 
 var exchangeNameRe = regexp.MustCompile(`^ex\.[A-Za-z0-9_-]+$`)

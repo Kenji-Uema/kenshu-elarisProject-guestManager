@@ -2,10 +2,11 @@ package app
 
 import (
 	"context"
-	"guestManager/internal/domain"
-	"guestManager/internal/port"
 	"reflect"
 	"testing"
+
+	"github.com/Kenji-Uema/guestManager/internal/domain"
+	"github.com/Kenji-Uema/guestManager/internal/port"
 )
 
 func TestNewCleaningService(t *testing.T) {

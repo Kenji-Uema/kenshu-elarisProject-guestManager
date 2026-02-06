@@ -3,12 +3,13 @@ package mq
 import (
 	"context"
 	"errors"
-	"guestManager/internal/config"
-	"guestManager/internal/domain"
 	"log"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/Kenji-Uema/guestManager/internal/config"
+	"github.com/Kenji-Uema/guestManager/internal/domain"
 
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/rabbitmq"

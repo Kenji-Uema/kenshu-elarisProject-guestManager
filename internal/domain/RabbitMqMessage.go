@@ -1,6 +1,6 @@
 package domain
 
-import "guestManager/internal/app/validation"
+import "github.com/Kenji-Uema/guestManager/internal/app/validation"
 
 type RabbitMqMessage struct {
 	exchange    string

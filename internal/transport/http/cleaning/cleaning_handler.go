@@ -1,10 +1,11 @@
 package cleaning
 
 import (
-	"guestManager/internal/app"
-	"guestManager/internal/domain"
-	"guestManager/internal/transport/http/common"
 	"net/http"
+
+	"github.com/Kenji-Uema/guestManager/internal/app"
+	"github.com/Kenji-Uema/guestManager/internal/domain"
+	"github.com/Kenji-Uema/guestManager/internal/transport/http/common"
 
 	"github.com/gin-gonic/gin"
 )

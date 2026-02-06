@@ -1,9 +1,10 @@
 package validation
 
 import (
-	"guestManager/internal/domain/errors/validationErrors"
 	"regexp"
 	"time"
+
+	"github.com/Kenji-Uema/guestManager/internal/domain/errors/validationErrors"
 )
 
 var emailRe = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[A-Za-z]{2,}$`)

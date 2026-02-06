@@ -2,10 +2,10 @@ package app
 
 import (
 	"context"
-	"guestManager/internal/domain"
-	"guestManager/internal/port"
+	"log/slog"
 
-	"github.com/bytedance/gopkg/util/logger"
+	"github.com/Kenji-Uema/guestManager/internal/domain"
+	"github.com/Kenji-Uema/guestManager/internal/port"
 )
 
 type CleaningService interface {
@@ -25,7 +25,7 @@ func (c cleaningService) CleanRoom(ctx context.Context, r domain.CleaningRequest
 	message, err := domain.NewRabbitMqMessage(
 		"ex.cleanRoom", r.RoomName(), "application/json", nil)
 	if err != nil {
-		logger.Error("failed to create message", "error", err)
+		slog.Error("failed to create message", "error", err)
 		return err
 	}
 

@@ -3,16 +3,16 @@ package validation
 import (
 	"testing"
 
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 func TestValidator_NotNilObjectID(t *testing.T) {
 	testCases := map[string]struct {
-		input          primitive.ObjectID
+		input          bson.ObjectID
 		isInputInvalid bool
 	}{
-		"nil object id":  {primitive.NilObjectID, true},
-		"non-nil object": {primitive.NewObjectID(), false},
+		"nil object id":  {bson.NilObjectID, true},
+		"non-nil object": {bson.NewObjectID(), false},
 	}
 
 	for caseName, test := range testCases {

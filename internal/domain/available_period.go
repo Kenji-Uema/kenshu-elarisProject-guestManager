@@ -1,8 +1,9 @@
 package domain
 
 import (
-	"guestManager/internal/app/validation"
 	"time"
+
+	"github.com/Kenji-Uema/guestManager/internal/app/validation"
 )
 
 type CottageAvailablePeriod struct {

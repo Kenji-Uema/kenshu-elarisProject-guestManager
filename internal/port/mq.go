@@ -2,7 +2,8 @@ package port
 
 import (
 	"context"
-	"guestManager/internal/domain"
+
+	"github.com/Kenji-Uema/guestManager/internal/domain"
 )
 
 type MqPublisher interface {

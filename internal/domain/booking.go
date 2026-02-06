@@ -1,20 +1,19 @@
 package domain
 
 import (
-	"guestManager/internal/app/validation"
-
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"github.com/Kenji-Uema/guestManager/internal/app/validation"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 type Booking struct {
-	mainGuest      primitive.ObjectID
+	mainGuest      bson.ObjectID
 	numberOfGuests int
 	stayPeriod     Period
 	cottageName    string
 	status         string
 }
 
-func NewBooking(mainGuest primitive.ObjectID, numberOfGuests int, stayPeriod Period, cottageName string, status string) (Booking, error) {
+func NewBooking(mainGuest bson.ObjectID, numberOfGuests int, stayPeriod Period, cottageName string, status string) (Booking, error) {
 	if err := validation.New().PositiveValue("numberOfGuests", numberOfGuests).
 		NotZeroValue("stayPeriod", stayPeriod).
 		NotBlank("cottageName", cottageName).

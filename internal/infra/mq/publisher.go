@@ -3,10 +3,11 @@ package mq
 import (
 	"context"
 	"fmt"
-	"guestManager/internal/config"
-	"guestManager/internal/domain"
-	"guestManager/internal/port"
 	"time"
+
+	"github.com/Kenji-Uema/guestManager/internal/config"
+	"github.com/Kenji-Uema/guestManager/internal/domain"
+	"github.com/Kenji-Uema/guestManager/internal/port"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )

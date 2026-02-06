@@ -1,22 +1,21 @@
 package domain
 
 import (
-	"guestManager/internal/app/validation"
-	"guestManager/internal/domain/documents"
-	"guestManager/internal/domain/dto"
-
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"github.com/Kenji-Uema/guestManager/internal/app/validation"
+	"github.com/Kenji-Uema/guestManager/internal/domain/documents"
+	"github.com/Kenji-Uema/guestManager/internal/domain/dto"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 type Guest struct {
-	Id         primitive.ObjectID
+	Id         bson.ObjectID
 	documentId string
 	givenNames string
 	surname    string
 	email      string
 }
 
-func NewGuest(id primitive.ObjectID, documentId string, givenNames string, surname string, email string) (Guest, error) {
+func NewGuest(id bson.ObjectID, documentId string, givenNames string, surname string, email string) (Guest, error) {
 	if err := validation.New().
 		NotNilObjectID("Id", id).
 		NotBlank("documentId", documentId).
