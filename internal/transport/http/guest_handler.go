@@ -1,16 +1,15 @@
-package guest
+package http
 
 import (
 	"github.com/Kenji-Uema/guestManager/internal/app"
 	"github.com/Kenji-Uema/guestManager/internal/domain"
 	"github.com/Kenji-Uema/guestManager/internal/domain/dto"
-	"github.com/Kenji-Uema/guestManager/internal/transport/http/common"
 	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"github.com/gin-gonic/gin"
 )
 
-type Handler interface {
+type GuestHandler interface {
 	GetGuest(c *gin.Context)
 	AddGuest(c *gin.Context)
 	UpdateGuest(c *gin.Context)
@@ -20,12 +19,12 @@ type guestHandler struct {
 	service app.GuestService
 }
 
-func NewGuestHandler(service app.GuestService) Handler {
+func NewGuestHandler(service app.GuestService) GuestHandler {
 	return &guestHandler{service: service}
 }
 
 func (g guestHandler) GetGuest(c *gin.Context) {
-	var guestIdUri common.GuestIdURI
+	var guestIdUri GuestIdURI
 
 	if err := c.ShouldBindUri(&guestIdUri); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
@@ -80,7 +79,7 @@ func (g guestHandler) AddGuest(c *gin.Context) {
 
 func (g guestHandler) UpdateGuest(c *gin.Context) {
 	var updatedRequest dto.GuestDto
-	var guestIdUri common.GuestIdURI
+	var guestIdUri GuestIdURI
 
 	if err := c.ShouldBindUri(&guestIdUri); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})

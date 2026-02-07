@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Kenji-Uema/guestManager/internal/config"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 	"go.mongodb.org/mongo-driver/v2/mongo/readpref"
@@ -12,10 +13,12 @@ import (
 
 type Mdb struct {
 	client   *mongo.Client
-	database *mongo.Database
+	Database *mongo.Database
 }
 
-func NewMongoDb(connectionContext context.Context, uri, dbName string) (*Mdb, error) {
+func NewMongoDb(ctx context.Context, config config.MongoConfig) (*Mdb, error) {
+	uri := fmt.Sprintf("mongodb://%s:%s@%s", config.Username, config.Password, config.Host)
+
 	clientOptions := options.Client().
 		ApplyURI(uri).
 		SetConnectTimeout(10 * time.Second)
@@ -25,7 +28,7 @@ func NewMongoDb(connectionContext context.Context, uri, dbName string) (*Mdb, er
 		return nil, err
 	}
 
-	databaseContext, databaseCancel := context.WithTimeout(connectionContext, 5*time.Second)
+	databaseContext, databaseCancel := context.WithTimeout(ctx, 5*time.Second)
 	defer databaseCancel()
 
 	if err := client.Ping(databaseContext, readpref.Primary()); err != nil {
@@ -33,13 +36,9 @@ func NewMongoDb(connectionContext context.Context, uri, dbName string) (*Mdb, er
 		return nil, fmt.Errorf("mongo ping failed for URI: %s, error: %w", uri, err)
 	}
 
-	return &Mdb{client: client, database: client.Database(dbName)}, nil
+	return &Mdb{client: client, Database: client.Database(config.Database)}, nil
 }
 
 func (d *Mdb) Close(ctx context.Context) error {
 	return d.client.Disconnect(ctx)
-}
-
-func (d *Mdb) Collection(name string) *mongo.Collection {
-	return d.database.Collection(name)
 }

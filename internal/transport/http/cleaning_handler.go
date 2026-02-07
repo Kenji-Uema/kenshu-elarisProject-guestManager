@@ -1,16 +1,14 @@
-package cleaning
+package http
 
 import (
 	"net/http"
 
 	"github.com/Kenji-Uema/guestManager/internal/app"
 	"github.com/Kenji-Uema/guestManager/internal/domain"
-	"github.com/Kenji-Uema/guestManager/internal/transport/http/common"
-
 	"github.com/gin-gonic/gin"
 )
 
-type Handler interface {
+type CleaningHandler interface {
 	CleanRoom(c *gin.Context)
 }
 
@@ -18,13 +16,13 @@ type cleaningHandler struct {
 	service app.CleaningService
 }
 
-func NewCleaningHandler(service app.CleaningService) Handler {
+func NewCleaningHandler(service app.CleaningService) CleaningHandler {
 	return &cleaningHandler{service: service}
 }
 
 func (h cleaningHandler) CleanRoom(c *gin.Context) {
-	var needCleanQuery common.NeedCleanQuery
-	var roomUri common.RoomURI
+	var needCleanQuery NeedCleanQuery
+	var roomUri RoomURI
 
 	if err := c.ShouldBindQuery(&needCleanQuery); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

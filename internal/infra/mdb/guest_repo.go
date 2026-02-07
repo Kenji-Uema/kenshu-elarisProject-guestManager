@@ -20,7 +20,7 @@ type guestRepo struct {
 	collection *mongo.Collection
 }
 
-func NewGuestRepo(db *mongo.Database, config *config.GuestCollectionConfig) port.GuestRepo {
+func NewGuestRepo(db *mongo.Database, config config.GuestCollectionConfig) port.GuestRepo {
 	return &guestRepo{collection: db.Collection(config.Name)}
 }
 

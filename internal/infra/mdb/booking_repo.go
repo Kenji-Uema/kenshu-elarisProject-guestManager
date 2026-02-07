@@ -17,7 +17,7 @@ type bookingRepo struct {
 	collection *mongo.Collection
 }
 
-func NewBookingRepo(db *mongo.Database, config *config.BookingCollectionConfig) port.BookingRepo {
+func NewBookingRepo(db *mongo.Database, config config.BookingCollectionConfig) port.BookingRepo {
 	return &bookingRepo{collection: db.Collection(config.Name)}
 }
 

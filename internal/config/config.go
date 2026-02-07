@@ -1,22 +1,33 @@
 package config
 
 import (
-	"log"
+	"errors"
+	"log/slog"
 
 	"github.com/caarlos0/env/v11"
 )
+
+type Configs struct {
+	AppConfig
+	MongoConfig
+	RabbitMqConfig
+	GuestCollectionConfig
+	CottageCollectionConfig
+	BookingCollectionConfig
+	CleaningExchangeConfig
+	TelemetryConfig
+}
 
 type AppConfig struct {
 	ServiceName string `env:"SERVICE_NAME" required:"true"`
 	Version     string `env:"VERSION" required:"true"`
 }
 
-type MongoDbConfig struct {
-	Url      string `env:"MONGO_URL,required"`
-	Port     string `env:"MONGO_PORT,required"`
-	Db       string `env:"MONGO_DB,required"`
-	User     string `env:"MONGO_USER,required"`
-	Password string `env:"MONGO_PASSWORD,required"`
+type MongoConfig struct {
+	Username string `env:"MONGO_INITDB_ROOT_USERNAME" required:"true"`
+	Password string `env:"MONGO_INITDB_ROOT_PASSWORD" required:"true"`
+	Host     string `env:"MONGO_HOST" required:"true"`
+	Database string `env:"MONGO_DATABASE" required:"true"`
 }
 
 type RabbitMqConfig struct {
@@ -52,12 +63,45 @@ type TelemetryConfig struct {
 	OTLPInsecure   bool   `env:"OTEL_EXPORTER_OTLP_INSECURE" required:"true"`
 }
 
-func LoadConfig[C MongoDbConfig | GuestCollectionConfig | CottageCollectionConfig |
-	BookingCollectionConfig | RabbitMqConfig | CleaningExchangeConfig]() *C {
+func LoadConfigs() (Configs, error) {
+	var err error
+
+	appConfig, loadErr := loadConfig[AppConfig]()
+	err = errors.Join(err, loadErr)
+	mongoConfig, loadErr := loadConfig[MongoConfig]()
+	err = errors.Join(err, loadErr)
+	rabbitmqConfig, loadErr := loadConfig[RabbitMqConfig]()
+	err = errors.Join(err, loadErr)
+	guestCollectionConfig, loadErr := loadConfig[GuestCollectionConfig]()
+	err = errors.Join(err, loadErr)
+	cottageCollectionConfig, loadErr := loadConfig[CottageCollectionConfig]()
+	err = errors.Join(err, loadErr)
+	bookingCollectionConfig, loadErr := loadConfig[BookingCollectionConfig]()
+	err = errors.Join(err, loadErr)
+	cleaningExchangeConfig, loadErr := loadConfig[CleaningExchangeConfig]()
+	err = errors.Join(err, loadErr)
+	telemetryConfig, loadErr := loadConfig[TelemetryConfig]()
+	err = errors.Join(err, loadErr)
+
+	return Configs{
+		appConfig,
+		mongoConfig,
+		rabbitmqConfig,
+		guestCollectionConfig,
+		cottageCollectionConfig,
+		bookingCollectionConfig,
+		cleaningExchangeConfig,
+		telemetryConfig,
+	}, err
+}
+
+func loadConfig[C AppConfig | MongoConfig | GuestCollectionConfig | CottageCollectionConfig |
+	BookingCollectionConfig | RabbitMqConfig | CleaningExchangeConfig | TelemetryConfig]() (C, error) {
 	var c C
 	if err := env.Parse(&c); err != nil {
-		log.Fatal(err)
+		slog.Error("parse env config", "error", err)
+		return c, err
 	}
 
-	return &c
+	return c, nil
 }
