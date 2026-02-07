@@ -59,13 +59,10 @@ func main() {
 		}
 	}()
 
-	bookingRepo := mdb.NewBookingRepo(mongoDb.Database, configs.BookingCollectionConfig)
-	cottageRepo := mdb.NewCottageRepo(mongoDb.Database, configs.CottageCollectionConfig)
 	guestRepo := mdb.NewGuestRepo(mongoDb.Database, configs.GuestCollectionConfig)
 
 	cleaningService := app.NewCleaningService(cleaningPublisher)
 	guestService := app.NewGuestService(guestRepo)
-	receptionService := app.NewReceptionService(guestService, cleaningService, cottageRepo, bookingRepo)
 
 	cleaningHandler := http.NewCleaningHandler(cleaningService)
 	guestHandler := http.NewGuestHandler(guestService)

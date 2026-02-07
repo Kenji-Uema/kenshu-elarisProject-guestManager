@@ -4,6 +4,7 @@ import (
 	"github.com/Kenji-Uema/guestManager/internal/app"
 	"github.com/Kenji-Uema/guestManager/internal/domain"
 	"github.com/Kenji-Uema/guestManager/internal/domain/dto"
+	"github.com/Kenji-Uema/guestManager/internal/transport/http/bindings"
 	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"github.com/gin-gonic/gin"
@@ -24,7 +25,7 @@ func NewGuestHandler(service app.GuestService) GuestHandler {
 }
 
 func (g guestHandler) GetGuest(c *gin.Context) {
-	var guestIdUri GuestIdURI
+	var guestIdUri bindings.GuestIdURI
 
 	if err := c.ShouldBindUri(&guestIdUri); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
@@ -79,7 +80,7 @@ func (g guestHandler) AddGuest(c *gin.Context) {
 
 func (g guestHandler) UpdateGuest(c *gin.Context) {
 	var updatedRequest dto.GuestDto
-	var guestIdUri GuestIdURI
+	var guestIdUri bindings.GuestIdURI
 
 	if err := c.ShouldBindUri(&guestIdUri); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})

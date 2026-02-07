@@ -1,4 +1,4 @@
-package http
+package bindings
 
 type GuestIdURI struct {
 	Id string `uri:"id" binding:"required"`

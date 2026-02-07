@@ -5,6 +5,7 @@ import (
 
 	"github.com/Kenji-Uema/guestManager/internal/app"
 	"github.com/Kenji-Uema/guestManager/internal/domain"
+	"github.com/Kenji-Uema/guestManager/internal/transport/http/bindings"
 	"github.com/gin-gonic/gin"
 )
 
@@ -21,8 +22,8 @@ func NewCleaningHandler(service app.CleaningService) CleaningHandler {
 }
 
 func (h cleaningHandler) CleanRoom(c *gin.Context) {
-	var needCleanQuery NeedCleanQuery
-	var roomUri RoomURI
+	var needCleanQuery bindings.NeedCleanQuery
+	var roomUri bindings.RoomURI
 
 	if err := c.ShouldBindQuery(&needCleanQuery); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
