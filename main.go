@@ -69,6 +69,7 @@ func main() {
 
 	cleaningHandler := http.NewCleaningHandler(cleaningService)
 	guestHandler := http.NewGuestHandler(guestService)
+	probeHandler := http.NewProbeHandler(mongoDb, rabbitmqClient)
 
 	router := gin.Default()
 
@@ -83,6 +84,9 @@ func main() {
 	router.POST("/clean/:roomNumber", cleaningHandler.CleanRoom)
 
 	router.POST("/consume/:roomNumber/item/:itemName", nil)
+
+	router.GET("/healthz", probeHandler.Heath)
+	router.GET("/readyz", probeHandler.Ready)
 
 	err = router.Run("localhost:8080")
 	if err != nil {

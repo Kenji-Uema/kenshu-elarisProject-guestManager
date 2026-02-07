@@ -21,6 +21,10 @@ func NewRabbitMqConnection(cfg config.RabbitMqConfig) (*RabbitMqConnection, erro
 	return &RabbitMqConnection{conn: conn}, nil
 }
 
+func (c *RabbitMqConnection) IsConnectionOpen() bool {
+	return !c.conn.IsClosed()
+}
+
 func (c *RabbitMqConnection) Close() error {
 	return c.conn.Close()
 }

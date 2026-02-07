@@ -39,6 +39,10 @@ func NewMongoDb(ctx context.Context, config config.MongoConfig) (*Mdb, error) {
 	return &Mdb{client: client, Database: client.Database(config.Database)}, nil
 }
 
+func (d *Mdb) Ping() error {
+	return d.client.Ping(context.Background(), readpref.Primary())
+}
+
 func (d *Mdb) Close(ctx context.Context) error {
 	return d.client.Disconnect(ctx)
 }
