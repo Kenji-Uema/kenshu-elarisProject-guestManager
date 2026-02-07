@@ -6,6 +6,11 @@ import (
 	"github.com/caarlos0/env/v11"
 )
 
+type AppConfig struct {
+	ServiceName string `env:"SERVICE_NAME" required:"true"`
+	Version     string `env:"VERSION" required:"true"`
+}
+
 type MongoDbConfig struct {
 	Url      string `env:"MONGO_URL,required"`
 	Port     string `env:"MONGO_PORT,required"`
@@ -38,6 +43,13 @@ type CleaningExchangeConfig struct {
 	Internal       bool   `env:"CLEANING_EXCHANGE_INTERNAL" envDefault:"false"`
 	NoWait         bool   `env:"CLEANING_EXCHANGE_NO_WAIT" envDefault:"false"`
 	ConfirmNotWait bool   `env:"RABBITMQ_CONFIRM_NOT_WAIT" envDefault:"false"`
+}
+
+type TelemetryConfig struct {
+	OTLPEndpoint   string `env:"OTEL_EXPORTER_OTLP_ENDPOINT" required:"true"`
+	OTLPGrpcPort   int    `env:"OTEL_EXPORTER_OTLP_GRPC_PORT" required:"true"`
+	OTLPHealthPort int    `env:"OTEL_EXPORTER_OTLP_HEALTH_PORT" required:"true"`
+	OTLPInsecure   bool   `env:"OTEL_EXPORTER_OTLP_INSECURE" required:"true"`
 }
 
 func LoadConfig[C MongoDbConfig | GuestCollectionConfig | CottageCollectionConfig |
