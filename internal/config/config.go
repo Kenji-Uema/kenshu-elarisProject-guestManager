@@ -21,6 +21,8 @@ type Configs struct {
 type AppConfig struct {
 	ServiceName string `env:"SERVICE_NAME" required:"true"`
 	Version     string `env:"VERSION" required:"true"`
+	Host        string `env:"SERVICE_HOST" required:"true"`
+	Port        int    `env:"SERVICE_PORT" required:"true"`
 }
 
 type MongoConfig struct {
@@ -31,7 +33,10 @@ type MongoConfig struct {
 }
 
 type RabbitMqConfig struct {
-	Url string `env:"RABBITMQ_URL,required"`
+	Username string `env:"RABBITMQ_USERNAME" required:"true"`
+	Password string `env:"RABBITMQ_PASSWORD" required:"true"`
+	Host     string `env:"RABBITMQ_HOST" required:"true"`
+	Port     int    `env:"RABBITMQ_PORT" required:"true"`
 }
 
 type GuestCollectionConfig struct {

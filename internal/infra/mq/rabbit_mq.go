@@ -13,7 +13,7 @@ type RabbitMqConnection struct {
 }
 
 func NewRabbitMqConnection(cfg config.RabbitMqConfig) (*RabbitMqConnection, error) {
-	conn, err := amqp.Dial(cfg.Url)
+	conn, err := amqp.Dial(fmt.Sprintf("amqp://%s:%s@%s:%d", cfg.Username, cfg.Password, cfg.Host, cfg.Port))
 	if err != nil {
 		return nil, fmt.Errorf("dial rabbitmq: %w", err)
 	}

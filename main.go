@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -85,7 +86,7 @@ func main() {
 	router.GET("/healthz", probeHandler.Heath)
 	router.GET("/readyz", probeHandler.Ready)
 
-	err = router.Run("localhost:8080")
+	err = router.Run(fmt.Sprintf("%s:%d", configs.AppConfig.Host, configs.AppConfig.Port))
 	if err != nil {
 		return
 	}
