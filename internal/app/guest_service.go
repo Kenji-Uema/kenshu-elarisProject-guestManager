@@ -32,7 +32,8 @@ func (g *guestService) GetById(ctx context.Context, id bson.ObjectID) (domain.Gu
 		return domain.Guest{}, err
 	}
 
-	guest, err := domain.NewGuest(guestDoc.Id, guestDoc.DocumentId, guestDoc.GivenNames, guestDoc.Surname, guestDoc.Email)
+	guest, err := domain.NewGuest(guestDoc.Id, guestDoc.DocumentId, guestDoc.GivenNames, guestDoc.Surname,
+		guestDoc.Email, guestDoc.CreatedAt, guestDoc.LastUpdate)
 	if err != nil {
 		var validationErr *validationErrors.ErrValidationConstrain
 		if errors.As(err, &validationErr) {
@@ -51,7 +52,8 @@ func (g *guestService) GetByDocument(ctx context.Context, documentId string) (do
 		return domain.Guest{}, err
 	}
 
-	guest, err := domain.NewGuest(guestDoc.Id, guestDoc.DocumentId, guestDoc.GivenNames, guestDoc.Surname, guestDoc.Email)
+	guest, err := domain.NewGuest(guestDoc.Id, guestDoc.DocumentId, guestDoc.GivenNames, guestDoc.Surname,
+		guestDoc.Email, guestDoc.CreatedAt, guestDoc.LastUpdate)
 	if err != nil {
 		var validationErr *validationErrors.ErrValidationConstrain
 		if errors.As(err, &validationErr) {
@@ -76,7 +78,7 @@ func (g *guestService) Update(ctx context.Context, id bson.ObjectID, guest domai
 	}
 
 	updatedGuest, err := domain.NewGuest(updatedGuestDoc.Id, updatedGuestDoc.DocumentId, updatedGuestDoc.GivenNames,
-		updatedGuestDoc.Surname, updatedGuestDoc.Email)
+		updatedGuestDoc.Surname, updatedGuestDoc.Email, updatedGuestDoc.CreatedAt, updatedGuestDoc.LastUpdate)
 	if err != nil {
 		var validationErr *validationErrors.ErrValidationConstrain
 		if errors.As(err, &validationErr) {

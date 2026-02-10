@@ -14,6 +14,7 @@ import (
 	"github.com/Kenji-Uema/guestManager/internal/infra/mdb"
 	"github.com/Kenji-Uema/guestManager/internal/infra/mq"
 	"github.com/Kenji-Uema/guestManager/internal/tooling/log"
+	"github.com/Kenji-Uema/guestManager/internal/transport/grpc/clock"
 	"github.com/Kenji-Uema/guestManager/internal/transport/http"
 	"github.com/gin-gonic/gin"
 )
@@ -60,13 +61,17 @@ func main() {
 		}
 	}()
 
+	clockEmu, err := clock.NewClockEmu(configs.ClockEmuConfig)
+	exitOnError("failed to create grpc clockEmu", err)
+	defer clockEmu.Close()
+
 	guestRepo := mdb.NewGuestRepo(mongoDb.Database, configs.GuestCollectionConfig)
 
 	cleaningService := app.NewCleaningService(cleaningPublisher)
 	guestService := app.NewGuestService(guestRepo)
 
 	cleaningHandler := http.NewCleaningHandler(cleaningService)
-	guestHandler := http.NewGuestHandler(guestService)
+	guestHandler := http.NewGuestHandler(guestService, clockEmu)
 	probeHandler := http.NewProbeHandler(mongoDb, rabbitmqClient)
 
 	router := gin.Default()
