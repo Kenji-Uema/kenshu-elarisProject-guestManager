@@ -63,7 +63,12 @@ func main() {
 
 	clockEmu, err := clock.NewClockEmu(configs.ClockEmuConfig)
 	exitOnError("failed to create grpc clockEmu", err)
-	defer clockEmu.Close()
+	defer func(clockEmu *clock.Emu) {
+		err := clockEmu.Close()
+		if err != nil {
+			slog.Error("failed to close clockEmu", "error", err)
+		}
+	}(clockEmu)
 
 	guestRepo := mdb.NewGuestRepo(mongoDb.Database, configs.GuestCollectionConfig)
 
