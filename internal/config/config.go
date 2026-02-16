@@ -1,10 +1,16 @@
 package config
 
 import (
-	"errors"
+	"log/slog"
 
 	"github.com/caarlos0/env/v11"
 )
+
+type Secret string
+
+func (s Secret) String() string {
+	return "REDACTED"
+}
 
 type Configs struct {
 	AppConfig
@@ -26,15 +32,15 @@ type AppConfig struct {
 }
 
 type MongoConfig struct {
-	Username string `env:"MONGO_INITDB_ROOT_USERNAME,required"`
-	Password string `env:"MONGO_INITDB_ROOT_PASSWORD,required"`
+	Username Secret `env:"MONGO_INITDB_ROOT_USERNAME,required"`
+	Password Secret `env:"MONGO_INITDB_ROOT_PASSWORD,required"`
 	Host     string `env:"MONGO_HOST,required"`
 	Database string `env:"MONGO_DATABASE,required"`
 }
 
 type RabbitMqConfig struct {
-	Username string `env:"RABBITMQ_USERNAME,required"`
-	Password string `env:"RABBITMQ_PASSWORD,required"`
+	Username Secret `env:"RABBITMQ_USERNAME,required"`
+	Password Secret `env:"RABBITMQ_PASSWORD,required"`
 	Host     string `env:"RABBITMQ_HOST,required"`
 	Port     int    `env:"RABBITMQ_PORT,required"`
 }
@@ -74,46 +80,12 @@ type TelemetryConfig struct {
 }
 
 func LoadConfigs() (Configs, error) {
-	var err error
-
-	appConfig, loadErr := loadConfig[AppConfig]()
-	err = errors.Join(err, loadErr)
-	mongoConfig, loadErr := loadConfig[MongoConfig]()
-	err = errors.Join(err, loadErr)
-	rabbitmqConfig, loadErr := loadConfig[RabbitMqConfig]()
-	err = errors.Join(err, loadErr)
-	clockEmuConfig, loadErr := loadConfig[ClockEmuConfig]()
-	err = errors.Join(err, loadErr)
-	guestCollectionConfig, loadErr := loadConfig[GuestCollectionConfig]()
-	err = errors.Join(err, loadErr)
-	cottageCollectionConfig, loadErr := loadConfig[CottageCollectionConfig]()
-	err = errors.Join(err, loadErr)
-	bookingCollectionConfig, loadErr := loadConfig[BookingCollectionConfig]()
-	err = errors.Join(err, loadErr)
-	cleaningExchangeConfig, loadErr := loadConfig[CleaningExchangeConfig]()
-	err = errors.Join(err, loadErr)
-	telemetryConfig, loadErr := loadConfig[TelemetryConfig]()
-	err = errors.Join(err, loadErr)
-
-	return Configs{
-		appConfig,
-		mongoConfig,
-		rabbitmqConfig,
-		clockEmuConfig,
-		guestCollectionConfig,
-		cottageCollectionConfig,
-		bookingCollectionConfig,
-		cleaningExchangeConfig,
-		telemetryConfig,
-	}, err
-}
-
-func loadConfig[C AppConfig | MongoConfig | GuestCollectionConfig | CottageCollectionConfig | ClockEmuConfig |
-	BookingCollectionConfig | RabbitMqConfig | CleaningExchangeConfig | TelemetryConfig]() (C, error) {
-	var c C
-	if err := env.Parse(&c); err != nil {
-		return c, err
+	var cfg Configs
+	if err := env.Parse(&cfg); err != nil {
+		return cfg, err
 	}
 
-	return c, nil
+	slog.Info("config loaded", "config", cfg)
+
+	return cfg, nil
 }
