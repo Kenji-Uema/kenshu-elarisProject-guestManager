@@ -62,7 +62,7 @@ func (h guestHandler) AddGuest(c *gin.Context) {
 
 	createdTime, err := h.clockClient.Now(c.Request.Context())
 	if err != nil {
-		slog.Error(err.Error())
+		slog.ErrorContext(c.Request.Context(), err.Error())
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get clock time"})
 		return
 	}
@@ -83,7 +83,7 @@ func (h guestHandler) AddGuest(c *gin.Context) {
 
 	id, err := h.service.Add(c.Request.Context(), guest)
 	if err != nil {
-		slog.Error(err.Error())
+		slog.ErrorContext(c.Request.Context(), err.Error())
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -114,7 +114,7 @@ func (h guestHandler) UpdateGuest(c *gin.Context) {
 
 	createdTime, err := h.clockClient.Now(c.Request.Context())
 	if err != nil {
-		slog.Error(err.Error())
+		slog.ErrorContext(c.Request.Context(), err.Error())
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get clock time"})
 		return
 	}

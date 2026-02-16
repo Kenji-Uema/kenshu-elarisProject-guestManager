@@ -68,7 +68,7 @@ func (g *guestRepo) Add(ctx context.Context, newGuest documents.Guest) (bson.Obj
 	result, err := g.collection.InsertOne(ctx, newGuest)
 
 	if err != nil {
-		slog.Error("failed to insert guest", "error", err)
+		slog.ErrorContext(ctx, "failed to insert guest", "error", err)
 		return bson.NilObjectID, fmt.Errorf("%w: add new guest failed; guest=%v: %v",
 			dbErrors.ErrGuestRepo, newGuest, err)
 	}

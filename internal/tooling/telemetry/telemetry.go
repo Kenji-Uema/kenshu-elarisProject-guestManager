@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Kenji-Uema/guestManager/internal/config"
+	"go.opentelemetry.io/contrib/propagators/b3"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
@@ -23,19 +24,19 @@ func Init(ctx context.Context, cfg config.TelemetryConfig, appCfg config.AppConf
 		resource.WithTelemetrySDK(),
 		resource.WithAttributes(semconv.ServiceName(fmt.Sprintf("%s:%s", appCfg.ServiceName, appCfg.Version))))
 	if err != nil {
-		slog.Error("create otel resource", "error", err)
+		slog.ErrorContext(ctx, "create otel resource", "error", err)
 		return nil, err
 	}
 
 	traceProvider, err := newTraceProvider(ctx, otelResource, cfg)
 	if err != nil {
-		slog.Error("create trace provider", "error", err)
+		slog.ErrorContext(ctx, "create trace provider", "error", err)
 		return nil, err
 	}
 
 	meterProvider, err := newMeterProvider(ctx, otelResource, cfg)
 	if err != nil {
-		slog.Error("create meter provider", "error", err)
+		slog.ErrorContext(ctx, "create meter provider", "error", err)
 		return nil, err
 	}
 
@@ -44,13 +45,14 @@ func Init(ctx context.Context, cfg config.TelemetryConfig, appCfg config.AppConf
 
 	otel.SetTextMapPropagator(
 		propagation.NewCompositeTextMapPropagator(
+			b3.New(),
 			propagation.TraceContext{},
 			propagation.Baggage{},
 		),
 	)
 
 	if err := initMetrics(); err != nil {
-		slog.Error("create startup histogram", "error", err)
+		slog.ErrorContext(ctx, "create startup histogram", "error", err)
 		return nil, err
 	}
 

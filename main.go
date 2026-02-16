@@ -14,9 +14,11 @@ import (
 	"github.com/Kenji-Uema/guestManager/internal/infra/mdb"
 	"github.com/Kenji-Uema/guestManager/internal/infra/mq"
 	"github.com/Kenji-Uema/guestManager/internal/tooling/log"
+	"github.com/Kenji-Uema/guestManager/internal/tooling/telemetry"
 	"github.com/Kenji-Uema/guestManager/internal/transport/grpc/clock"
 	"github.com/Kenji-Uema/guestManager/internal/transport/http"
 	"github.com/gin-gonic/gin"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 )
 
 func exitOnError(errMsg string, err error) {
@@ -27,13 +29,21 @@ func exitOnError(errMsg string, err error) {
 }
 
 func main() {
-	slog.SetDefault(log.NewJsonLogger())
+	slog.SetDefault(log.NewLogger())
+	slog.Info("starting guestManager")
+
 	baseCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 
 	configs, err := config.LoadConfigs()
 	exitOnError("failed to load configs", err)
 
-	slog.Info("starting guestManager")
+	shutdownTelemetry, err := telemetry.Init(baseCtx, configs.TelemetryConfig, configs.AppConfig)
+	exitOnError("failed to initialize telemetry", err)
+	defer func() {
+		if err := shutdownTelemetry(baseCtx); err != nil {
+			slog.Error("shutdown telemetry", "error", err)
+		}
+	}()
 
 	rabbitmqClient, err := mq.NewRabbitMqConnection(configs.RabbitMqConfig)
 	exitOnError("failed to create rabbitmq connection", err)
@@ -80,6 +90,7 @@ func main() {
 	probeHandler := http.NewProbeHandler(mongoDb, rabbitmqClient)
 
 	router := gin.Default()
+	router.Use(otelgin.Middleware(configs.AppConfig.ServiceName))
 
 	router.GET("/guest/:userId", guestHandler.GetGuest)
 	router.GET("/guest/:userId/bookings", nil)
@@ -97,9 +108,7 @@ func main() {
 	router.GET("/readyz", probeHandler.Ready)
 
 	err = router.Run(fmt.Sprintf("%s:%d", configs.AppConfig.Host, configs.AppConfig.Port))
-	if err != nil {
-		return
-	}
+	exitOnError("failed to run http server", err)
 
 	stop()
 }

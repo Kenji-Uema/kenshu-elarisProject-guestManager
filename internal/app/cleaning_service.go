@@ -25,7 +25,7 @@ func (c cleaningService) CleanRoom(ctx context.Context, r domain.CleaningRequest
 	message, err := domain.NewRabbitMqMessage(
 		"ex.cleanRoom", r.RoomName(), "application/json", nil)
 	if err != nil {
-		slog.Error("failed to create message", "error", err)
+		slog.ErrorContext(ctx, "failed to create message", "error", err)
 		return err
 	}
 
