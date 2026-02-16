@@ -10,6 +10,6 @@ type CottageAvailablePeriod struct {
 }
 
 type Period struct {
-	Start time.Time
-	End   time.Time
+	Start time.Time `bson:"start"`
+	End   time.Time `bson:"end"`
 }

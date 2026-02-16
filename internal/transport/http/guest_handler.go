@@ -17,6 +17,7 @@ type GuestHandler interface {
 	GetGuest(c *gin.Context)
 	AddGuest(c *gin.Context)
 	UpdateGuest(c *gin.Context)
+	GetBookings(c *gin.Context)
 }
 
 type guestHandler struct {
@@ -141,4 +142,33 @@ func (h guestHandler) UpdateGuest(c *gin.Context) {
 	}
 
 	c.JSON(200, resultedGuest)
+}
+
+func (h guestHandler) GetBookings(c *gin.Context) {
+	var guestIdUri bindings.GuestIdURI
+
+	if err := c.ShouldBindUri(&guestIdUri); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	guestId, err := bson.ObjectIDFromHex(guestIdUri.Id)
+
+	if err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	bookingsDomain, err := h.service.GetBookings(c.Request.Context(), guestId)
+	if err != nil {
+		c.JSON(404, gin.H{"error": err.Error()})
+		return
+	}
+
+	bookingsDto := make([]dto.BookingDto, len(bookingsDomain))
+	for _, booking := range bookingsDomain {
+		bookingsDto = append(bookingsDto, booking.ToDto())
+	}
+
+	c.JSON(200, bookingsDto)
 }

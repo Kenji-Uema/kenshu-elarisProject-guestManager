@@ -16,18 +16,20 @@ type GuestService interface {
 	GetByDocument(ctx context.Context, documentId string) (domain.Guest, error)
 	Add(ctx context.Context, guest domain.Guest) (bson.ObjectID, error)
 	Update(ctx context.Context, id bson.ObjectID, guest domain.Guest) (domain.Guest, error)
+	GetBookings(ctx context.Context, guestId bson.ObjectID) ([]domain.Booking, error)
 }
 
 type guestService struct {
-	repo port.GuestRepo
+	guestRepo   port.GuestRepo
+	bookingRepo port.BookingRepo
 }
 
-func NewGuestService(guestRepo port.GuestRepo) GuestService {
-	return &guestService{repo: guestRepo}
+func NewGuestService(guestRepo port.GuestRepo, bookingRepo port.BookingRepo) GuestService {
+	return &guestService{guestRepo: guestRepo, bookingRepo: bookingRepo}
 }
 
-func (g *guestService) GetById(ctx context.Context, id bson.ObjectID) (domain.Guest, error) {
-	guestDoc, err := g.repo.GetById(ctx, id)
+func (s *guestService) GetById(ctx context.Context, id bson.ObjectID) (domain.Guest, error) {
+	guestDoc, err := s.guestRepo.GetById(ctx, id)
 	if err != nil {
 		return domain.Guest{}, err
 	}
@@ -46,8 +48,8 @@ func (g *guestService) GetById(ctx context.Context, id bson.ObjectID) (domain.Gu
 	return guest, nil
 }
 
-func (g *guestService) GetByDocument(ctx context.Context, documentId string) (domain.Guest, error) {
-	guestDoc, err := g.repo.GetByDocument(ctx, documentId)
+func (s *guestService) GetByDocument(ctx context.Context, documentId string) (domain.Guest, error) {
+	guestDoc, err := s.guestRepo.GetByDocument(ctx, documentId)
 	if err != nil {
 		return domain.Guest{}, err
 	}
@@ -67,12 +69,12 @@ func (g *guestService) GetByDocument(ctx context.Context, documentId string) (do
 
 }
 
-func (g *guestService) Add(ctx context.Context, guest domain.Guest) (bson.ObjectID, error) {
-	return g.repo.Add(ctx, guest.ToMongoDoc())
+func (s *guestService) Add(ctx context.Context, guest domain.Guest) (bson.ObjectID, error) {
+	return s.guestRepo.Add(ctx, guest.ToMongoDoc())
 }
 
-func (g *guestService) Update(ctx context.Context, id bson.ObjectID, guest domain.Guest) (domain.Guest, error) {
-	updatedGuestDoc, err := g.repo.Update(ctx, id, guest.ToMongoDoc())
+func (s *guestService) Update(ctx context.Context, id bson.ObjectID, guest domain.Guest) (domain.Guest, error) {
+	updatedGuestDoc, err := s.guestRepo.Update(ctx, id, guest.ToMongoDoc())
 	if err != nil {
 		return domain.Guest{}, err
 	}
@@ -89,4 +91,36 @@ func (g *guestService) Update(ctx context.Context, id bson.ObjectID, guest domai
 	}
 
 	return updatedGuest, nil
+}
+
+func (s *guestService) GetBookings(ctx context.Context, guestId bson.ObjectID) ([]domain.Booking, error) {
+	bookingsDoc, err := s.bookingRepo.FindByGuestId(ctx, guestId)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(bookingsDoc) == 0 {
+		return []domain.Booking{}, nil
+	}
+
+	bookings := make([]domain.Booking, len(bookingsDoc))
+	for _, b := range bookingsDoc {
+		stayPeriod, err := domain.NewPeriod(b.StayPeriod.Start, b.StayPeriod.End)
+		if err != nil {
+			return nil, err
+		}
+		booking, err := domain.NewBooking(
+			b.MainGuest,
+			b.NumberOfGuests,
+			stayPeriod,
+			b.CottageName,
+			b.Status,
+		)
+		if err != nil {
+			return nil, err
+		}
+		bookings = append(bookings, booking)
+	}
+
+	return bookings, err
 }

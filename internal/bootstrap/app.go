@@ -70,16 +70,21 @@ func BuildApp(ctx context.Context, cfg config.Configs) (*App, error) {
 	})
 
 	guestRepo := mdb.NewGuestRepo(mongoDb.Database, cfg.GuestCollectionConfig)
+	bookingRepo := mdb.NewBookingRepo(mongoDb.Database, cfg.BookingCollectionConfig)
+	cottageRepo := mdb.NewCottageRepo(mongoDb.Database, cfg.CottageCollectionConfig)
+
 	cleaningService := app.NewCleaningService(cleaningPublisher)
-	guestService := app.NewGuestService(guestRepo)
+	guestService := app.NewGuestService(guestRepo, bookingRepo)
+	receptionService := app.NewReceptionService(guestService, cleaningService, cottageRepo, bookingRepo)
 
 	cleaningHandler := transporthttp.NewCleaningHandler(cleaningService)
 	guestHandler := transporthttp.NewGuestHandler(guestService, clockEmu)
+	receptionHandler := transporthttp.NewReceptionHandler(receptionService)
 	probeHandler := transporthttp.NewProbeHandler(mongoDb, rabbitmqClient)
 
 	router := gin.Default()
 	router.Use(otelgin.Middleware(cfg.AppConfig.ServiceName))
-	registerRoutes(router, guestHandler, cleaningHandler, probeHandler)
+	registerRoutes(router, guestHandler, cleaningHandler, receptionHandler, probeHandler)
 
 	return &App{Router: router, cleanup: cleanup}, nil
 }
@@ -99,14 +104,14 @@ func runCleanup(ctx context.Context, cleanup []func(context.Context) error) erro
 }
 
 func registerRoutes(router *gin.Engine, guestHandler transporthttp.GuestHandler, cleaningHandler transporthttp.CleaningHandler,
-	probeHandler transporthttp.ProbeHandler) {
+	receptionHandler transporthttp.ReceptionHandler, probeHandler transporthttp.ProbeHandler) {
 	router.GET("/guest/:userId", guestHandler.GetGuest)
-	router.GET("/guest/:userId/bookings", nil)
+	router.GET("/guest/:userId/bookings", guestHandler.GetBookings)
 	router.POST("/guest", guestHandler.AddGuest)
 	router.PATCH("/guest/:userId", guestHandler.UpdateGuest)
 
-	router.POST("/checkin/:userId/reservation/:reservationId", nil)
-	router.POST("/checkout/:userId/reservation/:reservationId", nil)
+	router.POST("/checkin/:userId/reservation/:reservationId", receptionHandler.CheckIn)
+	router.POST("/checkout/:userId/reservation/:reservationId", receptionHandler.CheckOut)
 
 	router.POST("/clean/:roomNumber", cleaningHandler.CleanRoom)
 

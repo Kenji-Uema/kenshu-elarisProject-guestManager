@@ -180,8 +180,8 @@ func Test_guestService_GetById(t *testing.T) {
 //	t.Parallel()
 //
 //	t.Run("updates guest and returns updated domain object", func(t *testing.T) {
-//		repo := test.NewGuestRepoFake(seed())
-//		service := NewGuestService(repo)
+//		guestRepo := test.NewGuestRepoFake(seed())
+//		service := NewGuestService(guestRepo)
 //		guest := seed()[guestId]
 //
 //		updatedGuest, err := domain.NewGuest(guestId, guest.DocumentId, "Johnny", "Doe", "johnny@test.com")
@@ -198,19 +198,19 @@ func Test_guestService_GetById(t *testing.T) {
 //			t.Fatalf("guestService.Update() = %+v, want %+v", got, updatedGuest)
 //		}
 //
-//		stored, err := repo.GetById(context.Background(), guestId)
+//		stored, err := guestRepo.GetById(context.Background(), guestId)
 //		if err != nil {
-//			t.Fatalf("guestService.Update() repo state error = %v", err)
+//			t.Fatalf("guestService.Update() guestRepo state error = %v", err)
 //		}
 //
 //		if !reflect.DeepEqual(stored, updatedGuest.ToMongoDoc()) {
-//			t.Fatalf("guestService.Update() repo stored %+v, want %+v", stored, updatedGuest.ToMongoDoc())
+//			t.Fatalf("guestService.Update() guestRepo stored %+v, want %+v", stored, updatedGuest.ToMongoDoc())
 //		}
 //	})
 //
 //	t.Run("returns validation error when repository returns invalid guest", func(t *testing.T) {
-//		repo := test.NewGuestRepoFake(seed())
-//		service := NewGuestService(repo)
+//		guestRepo := test.NewGuestRepoFake(seed())
+//		service := NewGuestService(guestRepo)
 //
 //		_, err := service.Update(context.Background(), guestId, domain.Guest{})
 //		if err == nil {
