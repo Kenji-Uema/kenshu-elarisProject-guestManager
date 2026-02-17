@@ -10,7 +10,7 @@ import (
 
 	"github.com/Kenji-Uema/guestManager/internal/bootstrap"
 	"github.com/Kenji-Uema/guestManager/internal/config"
-	"github.com/Kenji-Uema/guestManager/internal/tooling/log"
+	"github.com/Kenji-Uema/guestManager/internal/infra/logging"
 )
 
 func exitOnError(ctx context.Context, errMsg string, err error) {
@@ -21,7 +21,7 @@ func exitOnError(ctx context.Context, errMsg string, err error) {
 }
 
 func main() {
-	slog.SetDefault(log.NewLogger())
+	slog.SetDefault(logging.NewLogger())
 	baseCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 

@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"log"
+	"net/url"
 	"os"
+	"strconv"
 	"testing"
 	"time"
 
@@ -47,8 +49,26 @@ func TestMain(m *testing.M) {
 		log.Fatalf("failed to get AMQP URL: %s", err)
 	}
 
+	parsedURL, err := url.Parse(amqpURL)
+	if err != nil {
+		log.Fatalf("failed to parse AMQP URL: %s", err)
+	}
+	password, _ := parsedURL.User.Password()
+
 	mqConnection, err = NewRabbitMqConnection(config.RabbitMqConfig{
-		Url: amqpURL,
+		Username: config.Secret(parsedURL.User.Username()),
+		Password: config.Secret(password),
+		Host:     parsedURL.Hostname(),
+		Port: func() int {
+			if parsedURL.Port() == "" {
+				return 5672
+			}
+			p, convErr := strconv.Atoi(parsedURL.Port())
+			if convErr != nil {
+				log.Fatalf("failed to parse AMQP port: %s", convErr)
+			}
+			return p
+		}(),
 	})
 	if err != nil {
 		log.Fatalf("failed to create rabbitmq connection: %s", err)

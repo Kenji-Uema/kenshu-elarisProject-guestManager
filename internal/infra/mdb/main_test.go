@@ -2,11 +2,14 @@ package mdb
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/Kenji-Uema/guestManager/internal/config"
 	"github.com/Kenji-Uema/guestManager/internal/domain/documents"
 
 	"github.com/testcontainers/testcontainers-go"
@@ -42,14 +45,28 @@ func TestMain(m *testing.M) {
 		log.Fatalf("failed to get connection string: %v", err)
 	}
 
-	db, err := NewMongoDb(context.Background(), uri, "test_db")
+	parsedURI, err := url.Parse(uri)
+	if err != nil {
+		log.Fatalf("failed to parse connection string: %v", err)
+	}
+	mongoHost := parsedURI.Host
+	if parsedURI.RawQuery != "" {
+		mongoHost = fmt.Sprintf("%s/?%s", parsedURI.Host, parsedURI.RawQuery)
+	}
+
+	db, err := NewMongoDb(context.Background(), config.MongoConfig{
+		Username: "test_user",
+		Password: "test_pass",
+		Host:     mongoHost,
+		Database: "test_db",
+	})
 	if err != nil {
 		log.Fatalf("failed to connect mongo client: %v", err)
 	}
 
-	bookingRepository = &bookingRepo{collection: db.Collection("Booking")}
-	cottageRepository = &cottageRepo{collection: db.Collection("Cottage")}
-	guestRepository = &guestRepo{collection: db.Collection("Guest")}
+	bookingRepository = &bookingRepo{collection: db.Database.Collection("Booking")}
+	cottageRepository = &cottageRepo{collection: db.Database.Collection("Cottage")}
+	guestRepository = &guestRepo{collection: db.Database.Collection("Guest")}
 
 	code := m.Run()
 
@@ -66,9 +83,9 @@ func setupAndRun(testName string, t *testing.T, test func(t *testing.T, ct *mong
 	bookingCollection := bookingRepository.collection
 	guestCollection := guestRepository.collection
 
-	seed[documents.Cottage](t, cottageCollection, "../../test_data/cottages_fixture.json")
-	seed[documents.Booking](t, bookingCollection, "../../test_data/bookings_fixture.json")
-	seed[documents.Guest](t, guestCollection, "../../test_data/guests_fixture.json")
+	seed[documents.Cottage](t, cottageCollection, "../../../test/test_data/cottages_fixture.json")
+	seed[documents.Booking](t, bookingCollection, "../../../test/test_data/bookings_fixture.json")
+	seed[documents.Guest](t, guestCollection, "../../../test/test_data/guests_fixture.json")
 
 	t.Cleanup(func() {
 		_ = cottageCollection.Drop(context.Background())

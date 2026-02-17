@@ -10,7 +10,7 @@ import (
 	"github.com/Kenji-Uema/guestManager/internal/config"
 	"github.com/Kenji-Uema/guestManager/internal/infra/mdb"
 	"github.com/Kenji-Uema/guestManager/internal/infra/mq"
-	"github.com/Kenji-Uema/guestManager/internal/tooling/telemetry"
+	"github.com/Kenji-Uema/guestManager/internal/infra/telemetry"
 	"github.com/Kenji-Uema/guestManager/internal/transport/grpc/clock"
 	transporthttp "github.com/Kenji-Uema/guestManager/internal/transport/http"
 	"github.com/gin-gonic/gin"

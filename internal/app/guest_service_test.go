@@ -1,24 +1,46 @@
 package app
 
 import (
+	"context"
 	"errors"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/Kenji-Uema/guestManager/internal/domain"
 	"github.com/Kenji-Uema/guestManager/internal/domain/documents"
 	"github.com/Kenji-Uema/guestManager/internal/domain/errors/dbErrors"
 	"github.com/Kenji-Uema/guestManager/internal/domain/errors/validationErrors"
-	"github.com/Kenji-Uema/guestManager/internal/test"
+	"github.com/Kenji-Uema/guestManager/internal/port"
+	"github.com/Kenji-Uema/guestManager/test"
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 var guestId = bson.NewObjectID()
+var fixedTime = time.Unix(1_700_000_000, 0).UTC()
 
 func seed() map[bson.ObjectID]documents.Guest {
 	return map[bson.ObjectID]documents.Guest{
-		guestId: {Id: guestId, DocumentId: "1234567890", GivenNames: "John", Surname: "Smith", Email: "test@test.com"},
+		guestId: {
+			Id:         guestId,
+			DocumentId: "1234567890",
+			GivenNames: "John",
+			Surname:    "Smith",
+			Email:      "test@test.com",
+			CreatedAt:  &fixedTime,
+			LastUpdate: &fixedTime,
+		},
 	}
+}
+
+type bookingRepoFake struct{}
+
+func (b *bookingRepoFake) FindByGuestId(_ context.Context, _ bson.ObjectID) ([]documents.Booking, error) {
+	return []documents.Booking{}, nil
+}
+
+func newGuestService(guestRepo port.GuestRepo) GuestService {
+	return NewGuestService(guestRepo, &bookingRepoFake{})
 }
 
 func assertEqual[T any](t *testing.T, want, got T) {
@@ -49,7 +71,7 @@ func assertErrorAs[T error](t *testing.T, err error) {
 func setupAndRunParallel(fn func(service GuestService)) func(t *testing.T) {
 	return func(t *testing.T) {
 		repo := test.NewGuestRepoFake(seed())
-		service := NewGuestService(repo)
+		service := newGuestService(repo)
 
 		t.Parallel()
 		fn(service)
@@ -58,7 +80,8 @@ func setupAndRunParallel(fn func(service GuestService)) func(t *testing.T) {
 
 func Test_guestService_Add(t *testing.T) {
 	newGuestId := bson.NewObjectID()
-	newGuest, _ := domain.NewGuest(newGuestId, "0987654321", "Alice", "Doe", "alice@example.com")
+	now := time.Now()
+	newGuest, _ := domain.NewGuest(newGuestId, "0987654321", "Alice", "Doe", "alice@example.com", &now, &now)
 
 	t.Run("guestService_Add adds guest", setupAndRunParallel(func(service GuestService) {
 		got, err := service.Add(t.Context(), newGuest)
@@ -70,7 +93,15 @@ func Test_guestService_Add(t *testing.T) {
 
 func Test_guestService_GetByDocument(t *testing.T) {
 	guestDoc := seed()[guestId]
-	guest, _ := domain.NewGuest(guestId, guestDoc.DocumentId, guestDoc.GivenNames, guestDoc.Surname, guestDoc.Email)
+	guest, _ := domain.NewGuest(
+		guestId,
+		guestDoc.DocumentId,
+		guestDoc.GivenNames,
+		guestDoc.Surname,
+		guestDoc.Email,
+		guestDoc.CreatedAt,
+		guestDoc.LastUpdate,
+	)
 
 	testCases := map[string]struct {
 		input  string
@@ -103,7 +134,15 @@ func Test_guestService_GetByDocument(t *testing.T) {
 func Test_guestService_GetById(t *testing.T) {
 	guest := seed()[guestId]
 
-	validGuest, _ := domain.NewGuest(guestId, guest.DocumentId, guest.GivenNames, guest.Surname, guest.Email)
+	validGuest, _ := domain.NewGuest(
+		guestId,
+		guest.DocumentId,
+		guest.GivenNames,
+		guest.Surname,
+		guest.Email,
+		guest.CreatedAt,
+		guest.LastUpdate,
+	)
 
 	badId := bson.NewObjectID()
 
@@ -131,7 +170,13 @@ func Test_guestService_GetById(t *testing.T) {
 		{
 			name: "returns validation error when stored seed invalid",
 			repo: test.NewGuestRepoFake(map[bson.ObjectID]documents.Guest{
-				badId: {Id: bson.NilObjectID, DocumentId: "invalid", GivenNames: "John", Surname: "Smith", Email: "test@test.com"},
+				badId: {
+					Id:         bson.NilObjectID,
+					DocumentId: "invalid",
+					GivenNames: "John",
+					Surname:    "Smith",
+					Email:      "test@test.com",
+				},
 			}),
 			id:      badId,
 			wantErr: true,
@@ -144,7 +189,7 @@ func Test_guestService_GetById(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			service := NewGuestService(tt.repo)
+			service := newGuestService(tt.repo)
 			got, err := service.GetById(t.Context(), tt.id)
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("guestService.GetById() error = %v, wantErr %v", err, tt.wantErr)
