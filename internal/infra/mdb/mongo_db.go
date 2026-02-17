@@ -9,6 +9,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 	"go.mongodb.org/mongo-driver/v2/mongo/readpref"
+	"go.opentelemetry.io/contrib/instrumentation/go.mongodb.org/mongo-driver/v2/mongo/otelmongo"
 )
 
 type Mdb struct {
@@ -21,6 +22,9 @@ func NewMongoDb(ctx context.Context, config config.MongoConfig) (*Mdb, error) {
 
 	clientOptions := options.Client().
 		ApplyURI(uri).
+		SetMonitor(otelmongo.NewMonitor(
+			otelmongo.WithCommandAttributeDisabled(true),
+		)).
 		SetConnectTimeout(10 * time.Second)
 	client, err := mongo.Connect(clientOptions)
 
