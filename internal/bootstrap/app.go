@@ -83,6 +83,7 @@ func BuildApp(ctx context.Context, cfg config.Configs) (*App, error) {
 	probeHandler := transporthttp.NewProbeHandler(mongoDb, rabbitmqClient)
 
 	router := gin.Default()
+	router.Use(gin.Recovery())
 	router.Use(otelgin.Middleware(cfg.AppConfig.ServiceName))
 	registerRoutes(router, guestHandler, cleaningHandler, receptionHandler, probeHandler)
 
