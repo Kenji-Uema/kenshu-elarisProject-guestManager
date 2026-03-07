@@ -1,0 +1,120 @@
+syntax = "proto3";
+package lodging.v1;
+
+option go_package = "github.com/Kenji-Uema/guestManager/api/proto/lodging;lodgingv1";
+
+import "google/protobuf/timestamp.proto";
+import "lodging/guest.proto";
+import "lodging/system.proto";
+
+// Transport envelope used for websocket exchange between guest and system.
+message ChatMessage {
+  // Unique ID for this message.
+  string message_id = 1;
+  // Correlates request/response pairs across messages.
+  string correlation_id = 2;
+  // UTC time at message creation.
+  google.protobuf.Timestamp sent_at = 3;
+  // Originating actor.
+  Sender sender = 4;
+  // Monotonic sequence per websocket session.
+  uint64 sequence = 5;
+  // Protocol contract version (for example: "lodging.v1").
+  string protocol_version = 12;
+  // Current interaction phase for message validation/routing.
+  LifecyclePhase phase = 13;
+
+  // Exactly one payload variant per envelope.
+  oneof payload {
+    // Guest-initiated lifecycle action.
+    GuestAction guest_action = 6;
+    // Guest data/action response to a system request.
+    GuestResponse guest_response = 7;
+    // Informational event emitted by the system.
+    SystemNotification system_notification = 8;
+    // Action/data request emitted by the system.
+    SystemRequest system_request = 9;
+    // Delivery/processing acknowledgment for a prior message.
+    Ack ack = 10;
+    // Structured protocol/domain error payload.
+    ErrorDetail error_detail = 11;
+  }
+}
+
+// Actor that produced the message.
+enum Sender {
+  // Default zero value.
+  SENDER_UNSPECIFIED = 0;
+  // Guest-originated message.
+  SENDER_GUEST = 1;
+  // System-originated message.
+  SENDER_SYSTEM = 2;
+}
+
+// Acknowledges a previously received message.
+message Ack {
+  // Message ID being acknowledged.
+  string acknowledged_message_id = 1;
+  // Ack processing result.
+  AckStatus status = 2;
+  // Machine-readable result code. Clients should branch on this value.
+  ErrorCode code = 3;
+  // Human-readable context for accepted/rejected handling.
+  string reason = 4;
+}
+
+// Acknowledgment outcome.
+enum AckStatus {
+  // Default zero value.
+  ACK_STATUS_UNSPECIFIED = 0;
+  // Message accepted and processed.
+  ACK_STATUS_ACCEPTED = 1;
+  // Message rejected and not processed.
+  ACK_STATUS_REJECTED = 2;
+}
+
+// Structured error payload for machine handling and retries.
+message ErrorDetail {
+  // Machine-readable error code. Clients should branch on this value.
+  ErrorCode code = 1;
+  // Human-readable error message.
+  string message = 2;
+  // Indicates whether the operation can be retried safely.
+  bool retryable = 3;
+  // Optional implementation-specific details for diagnostics.
+  string details = 4;
+}
+
+// High-level lifecycle phase used for websocket flow validation.
+enum LifecyclePhase {
+  // Default zero value.
+  LIFECYCLE_PHASE_UNSPECIFIED = 0;
+  // Guest is in check-in flow.
+  LIFECYCLE_PHASE_CHECK_IN = 1;
+  // Guest is checked in and currently staying.
+  LIFECYCLE_PHASE_STAY = 2;
+  // Guest is in checkout flow.
+  LIFECYCLE_PHASE_CHECK_OUT = 3;
+  // Stay is complete.
+  LIFECYCLE_PHASE_COMPLETED = 4;
+}
+
+// Stable machine-readable error codes for protocol and domain handling.
+enum ErrorCode {
+  // Default zero value.
+  ERROR_CODE_UNSPECIFIED = 0;
+  // No error / successful processing.
+  ERROR_CODE_NONE = 1;
+  // Message failed schema or required-field validation.
+  ERROR_CODE_VALIDATION_FAILED = 2;
+  // Message ordering or correlation is invalid.
+  ERROR_CODE_INVALID_STATE = 3;
+  // Requested entity was not found.
+  ERROR_CODE_NOT_FOUND = 4;
+  // Caller does not have permission for requested action.
+  ERROR_CODE_PERMISSION_DENIED = 5;
+  // Temporary system condition; safe to retry.
+  ERROR_CODE_TEMPORARY_UNAVAILABLE = 6;
+  // Unexpected internal failure.
+  ERROR_CODE_INTERNAL = 7;
+}
