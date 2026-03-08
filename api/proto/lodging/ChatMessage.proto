@@ -1,7 +1,7 @@
 syntax = "proto3";
 package lodging.v1;
 
-option go_package = "github.com/Kenji-Uema/guestManager/api/proto/lodging;lodgingv1";
+option go_package = "github.com/Kenji-Uema/guestManager/internal/domain/dto;dto";
 
 import "google/protobuf/timestamp.proto";
 import "lodging/guest.proto";
