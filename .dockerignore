@@ -1,0 +1,9 @@
+.git
+.idea
+.gocache
+.gomodcache
+tmp
+*.log
+*.out
+bin
+dist
