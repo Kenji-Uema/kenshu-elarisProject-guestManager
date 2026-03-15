@@ -28,29 +28,33 @@ const (
 	// Default zero value.
 	GuestAction_GUEST_ACTION_UNSPECIFIED GuestAction = 0
 	// Guest arrives to start check-in.
-	GuestAction_SHOW_FOR_CHECKIN GuestAction = 1
+	GuestAction_SHOW_FOR_CHECKIN    GuestAction = 1
+	GuestAction_SHOW_DOCUMENT       GuestAction = 2
+	GuestAction_SHOW_BOOKING_NUMBER GuestAction = 3
 	// Guest enters the assigned cottage.
-	GuestAction_ENTER_COTTAGE GuestAction = 2
+	GuestAction_ENTER_COTTAGE GuestAction = 4
 	// Guest leaves the assigned cottage.
-	GuestAction_LEAVE_COTTAGE GuestAction = 3
+	GuestAction_LEAVE_COTTAGE GuestAction = 5
 	// Guest leaves cottage to use bath facilities.
-	GuestAction_GO_FOR_A_BATH GuestAction = 4
+	GuestAction_GO_FOR_A_BATH GuestAction = 6
 	// Guest comes back from bath facilities.
-	GuestAction_RETURN_FROM_BATH GuestAction = 5
+	GuestAction_RETURN_FROM_BATH GuestAction = 7
 	// Guest goes to dinner.
-	GuestAction_GO_FOR_DINNER GuestAction = 6
+	GuestAction_GO_FOR_DINNER GuestAction = 8
 	// Guest goes to breakfast.
-	GuestAction_GO_FOR_BREAKFAST GuestAction = 7
+	GuestAction_GO_FOR_BREAKFAST GuestAction = 9
 	// Guest goes to sleep.
-	GuestAction_GO_TO_SLEEP GuestAction = 8
+	GuestAction_GO_TO_SLEEP GuestAction = 10
 	// Guest wakes up.
-	GuestAction_WAKEUP GuestAction = 9
+	GuestAction_WAKEUP GuestAction = 11
 	// Guest notifies they are leaving for cleanup.
-	GuestAction_LEAVE_CLEANUP_NOTIFICATION GuestAction = 10
+	GuestAction_LEAVE_CLEANUP_NOTIFICATION GuestAction = 12
 	// Guest stays in resort common areas.
-	GuestAction_ENJOY_RESORT GuestAction = 11
+	GuestAction_ENJOY_RESORT GuestAction = 13
 	// Guest proceeds to checkout process.
-	GuestAction_PROCEED_TO_CHECKOUT GuestAction = 12
+	GuestAction_PROCEED_TO_CHECKOUT GuestAction = 14
+	GuestAction_RETURN_COTTAGE_KEY  GuestAction = 15
+	GuestAction_TAKE_COTTAGE_KEY    GuestAction = 16
 )
 
 // Enum value maps for GuestAction.
@@ -58,32 +62,40 @@ var (
 	GuestAction_name = map[int32]string{
 		0:  "GUEST_ACTION_UNSPECIFIED",
 		1:  "SHOW_FOR_CHECKIN",
-		2:  "ENTER_COTTAGE",
-		3:  "LEAVE_COTTAGE",
-		4:  "GO_FOR_A_BATH",
-		5:  "RETURN_FROM_BATH",
-		6:  "GO_FOR_DINNER",
-		7:  "GO_FOR_BREAKFAST",
-		8:  "GO_TO_SLEEP",
-		9:  "WAKEUP",
-		10: "LEAVE_CLEANUP_NOTIFICATION",
-		11: "ENJOY_RESORT",
-		12: "PROCEED_TO_CHECKOUT",
+		2:  "SHOW_DOCUMENT",
+		3:  "SHOW_BOOKING_NUMBER",
+		4:  "ENTER_COTTAGE",
+		5:  "LEAVE_COTTAGE",
+		6:  "GO_FOR_A_BATH",
+		7:  "RETURN_FROM_BATH",
+		8:  "GO_FOR_DINNER",
+		9:  "GO_FOR_BREAKFAST",
+		10: "GO_TO_SLEEP",
+		11: "WAKEUP",
+		12: "LEAVE_CLEANUP_NOTIFICATION",
+		13: "ENJOY_RESORT",
+		14: "PROCEED_TO_CHECKOUT",
+		15: "RETURN_COTTAGE_KEY",
+		16: "TAKE_COTTAGE_KEY",
 	}
 	GuestAction_value = map[string]int32{
 		"GUEST_ACTION_UNSPECIFIED":   0,
 		"SHOW_FOR_CHECKIN":           1,
-		"ENTER_COTTAGE":              2,
-		"LEAVE_COTTAGE":              3,
-		"GO_FOR_A_BATH":              4,
-		"RETURN_FROM_BATH":           5,
-		"GO_FOR_DINNER":              6,
-		"GO_FOR_BREAKFAST":           7,
-		"GO_TO_SLEEP":                8,
-		"WAKEUP":                     9,
-		"LEAVE_CLEANUP_NOTIFICATION": 10,
-		"ENJOY_RESORT":               11,
-		"PROCEED_TO_CHECKOUT":        12,
+		"SHOW_DOCUMENT":              2,
+		"SHOW_BOOKING_NUMBER":        3,
+		"ENTER_COTTAGE":              4,
+		"LEAVE_COTTAGE":              5,
+		"GO_FOR_A_BATH":              6,
+		"RETURN_FROM_BATH":           7,
+		"GO_FOR_DINNER":              8,
+		"GO_FOR_BREAKFAST":           9,
+		"GO_TO_SLEEP":                10,
+		"WAKEUP":                     11,
+		"LEAVE_CLEANUP_NOTIFICATION": 12,
+		"ENJOY_RESORT":               13,
+		"PROCEED_TO_CHECKOUT":        14,
+		"RETURN_COTTAGE_KEY":         15,
+		"TAKE_COTTAGE_KEY":           16,
 	}
 )
 
@@ -440,23 +452,27 @@ const file_lodging_guest_proto_rawDesc = "" +
 	"\x11ReceiveCottageKey\x12$\n" +
 	"\x0ecottage_key_id\x18\x01 \x01(\tR\fcottageKeyId\"8\n" +
 	"\x10ReturnCottageKey\x12$\n" +
-	"\x0ecottage_key_id\x18\x01 \x01(\tR\fcottageKeyId*\xa1\x02\n" +
+	"\x0ecottage_key_id\x18\x01 \x01(\tR\fcottageKeyId*\xfb\x02\n" +
 	"\vGuestAction\x12\x1c\n" +
 	"\x18GUEST_ACTION_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10SHOW_FOR_CHECKIN\x10\x01\x12\x11\n" +
-	"\rENTER_COTTAGE\x10\x02\x12\x11\n" +
-	"\rLEAVE_COTTAGE\x10\x03\x12\x11\n" +
-	"\rGO_FOR_A_BATH\x10\x04\x12\x14\n" +
-	"\x10RETURN_FROM_BATH\x10\x05\x12\x11\n" +
-	"\rGO_FOR_DINNER\x10\x06\x12\x14\n" +
-	"\x10GO_FOR_BREAKFAST\x10\a\x12\x0f\n" +
-	"\vGO_TO_SLEEP\x10\b\x12\n" +
+	"\rSHOW_DOCUMENT\x10\x02\x12\x17\n" +
+	"\x13SHOW_BOOKING_NUMBER\x10\x03\x12\x11\n" +
+	"\rENTER_COTTAGE\x10\x04\x12\x11\n" +
+	"\rLEAVE_COTTAGE\x10\x05\x12\x11\n" +
+	"\rGO_FOR_A_BATH\x10\x06\x12\x14\n" +
+	"\x10RETURN_FROM_BATH\x10\a\x12\x11\n" +
+	"\rGO_FOR_DINNER\x10\b\x12\x14\n" +
+	"\x10GO_FOR_BREAKFAST\x10\t\x12\x0f\n" +
+	"\vGO_TO_SLEEP\x10\n" +
+	"\x12\n" +
 	"\n" +
-	"\x06WAKEUP\x10\t\x12\x1e\n" +
-	"\x1aLEAVE_CLEANUP_NOTIFICATION\x10\n" +
-	"\x12\x10\n" +
-	"\fENJOY_RESORT\x10\v\x12\x17\n" +
-	"\x13PROCEED_TO_CHECKOUT\x10\fB<Z:github.com/Kenji-Uema/guestManager/internal/domain/dto;dtob\x06proto3"
+	"\x06WAKEUP\x10\v\x12\x1e\n" +
+	"\x1aLEAVE_CLEANUP_NOTIFICATION\x10\f\x12\x10\n" +
+	"\fENJOY_RESORT\x10\r\x12\x17\n" +
+	"\x13PROCEED_TO_CHECKOUT\x10\x0e\x12\x16\n" +
+	"\x12RETURN_COTTAGE_KEY\x10\x0f\x12\x14\n" +
+	"\x10TAKE_COTTAGE_KEY\x10\x10B<Z:github.com/Kenji-Uema/guestManager/internal/domain/dto;dtob\x06proto3"
 
 var (
 	file_lodging_guest_proto_rawDescOnce sync.Once

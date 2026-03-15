@@ -85,7 +85,7 @@ func runRabbitMQContainer(ctx context.Context) (container *rabbitmq.RabbitMQCont
 }
 
 func setupAndRun(testName string, t *testing.T,
-	testFn func(t *testing.T, consumer port.MqConsumer, producer port.MqProducer)) {
+	testFn func(t *testing.T, consumer port.MqConsumer, producer port.MqPublisher)) {
 
 	consumer, err := NewRabbitmqConsumer(rabbitConn, config.ConsumeConfig{})
 	if err != nil {

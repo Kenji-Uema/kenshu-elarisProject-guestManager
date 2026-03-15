@@ -8,7 +8,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-type MqProducer interface {
+type MqPublisher interface {
 	DeclareExchange(config config.ExchangeConfig) error
 	Publish(ctx context.Context, message proto.Message, routingKey string) error
 	CloseChannel() error

@@ -39,6 +39,10 @@ func (b *bookingRepoFake) FindByGuestId(_ context.Context, _ bson.ObjectID) ([]d
 	return []documents.Booking{}, nil
 }
 
+func (b *bookingRepoFake) FindByGuestIdAndCheckIn(_ context.Context, _ bson.ObjectID, _ time.Time) (documents.Booking, error) {
+	return documents.Booking{}, nil
+}
+
 func newGuestService(guestRepo port.GuestRepo) GuestService {
 	return NewGuestService(guestRepo, &bookingRepoFake{})
 }

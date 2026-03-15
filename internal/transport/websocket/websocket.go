@@ -4,6 +4,8 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/Kenji-Uema/guestManager/internal/transport/websocket/handler"
+	"github.com/Kenji-Uema/guestManager/internal/transport/websocket/message"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 )
@@ -38,15 +40,23 @@ func (s *Server) Handle(c *gin.Context) {
 	}
 	defer conn.Close()
 
-	client := NewClient(conn)
-	checkinHandler := NewCheckinHandler(client)
-	stayHandler := NewStayHandler(client)
-	checkoutHandler := NewCheckoutHandler(client)
+	reader, writer := message.NewExchangeIO(conn)
+
+	checkinHandler := handler.NewCheckinHandler(writer, reader)
+	stayHandler := NewStayHandler(writer)
+	checkoutHandler := NewCheckoutHandler(writer)
+
+	if err := checkinHandler.WaitForGuest(c.Request.Context()); err != nil {
+		return
+	}
+
 	go func() {
-		checkinHandler.Handle()
+		if err := checkinHandler.Handle(c.Request.Context()); err != nil {
+			return
+		}
 		stayHandler.Handle()
 		checkoutHandler.Handle()
 	}()
 
-	client.readLoop(c.Request.Context())
+	reader.Read(c.Request.Context())
 }

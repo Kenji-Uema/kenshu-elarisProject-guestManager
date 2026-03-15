@@ -3,6 +3,7 @@ package mdb
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/Kenji-Uema/guestManager/internal/app/validation"
 	"github.com/Kenji-Uema/guestManager/internal/config"
@@ -42,4 +43,88 @@ func (b *bookingRepo) FindByGuestId(ctx context.Context, guestId bson.ObjectID) 
 	}
 
 	return bookings, nil
+}
+
+func (b *bookingRepo) FindByCheckInDate(ctx context.Context, date time.Time) ([]documents.Booking, error) {
+	if err := validation.New().NotZeroValue("date", date).Validate(); err != nil {
+		return nil, err
+	}
+
+	y, m, d := date.UTC().Date()
+	startOfDay := time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
+	nextDay := startOfDay.Add(24 * time.Hour)
+
+	filter := bson.M{
+		"stay_period.start": bson.M{
+			"$gte": startOfDay,
+			"$lt":  nextDay,
+		},
+	}
+
+	cursor, err := b.collection.Find(ctx, filter)
+	if err != nil {
+		return nil, fmt.Errorf("%w: could not find bookings for checkInDate=%s: %v",
+			dbErrors.ErrBookingRepo, startOfDay.Format(time.RFC3339), err)
+	}
+
+	//goland:noinspection GoUnhandledErrorResult
+	defer cursor.Close(ctx)
+
+	var bookings []documents.Booking
+	if err := cursor.All(ctx, &bookings); err != nil {
+		return nil, fmt.Errorf("%w: could not decode bookings for checkInDate=%s: %v",
+			dbErrors.ErrBookingRepo, startOfDay.Format(time.RFC3339), err)
+	}
+
+	return bookings, nil
+}
+
+func (b *bookingRepo) FindByGuestIdAndCheckIn(ctx context.Context, guestId bson.ObjectID, checkIn time.Time) (documents.Booking, error) {
+	if err := validation.New().
+		NotNilObjectID("guestId", guestId).
+		NotZeroValue("checkIn", checkIn).
+		Validate(); err != nil {
+		return documents.Booking{}, err
+	}
+
+	filter := bson.M{
+		"main_guest":        guestId,
+		"stay_period.start": checkIn,
+	}
+
+	var booking documents.Booking
+	if err := b.collection.FindOne(ctx, filter).Decode(&booking); err != nil {
+		return documents.Booking{}, fmt.Errorf("%w: could not find booking for guestId=%s and checkIn=%s: %v",
+			dbErrors.ErrBookingRepo, guestId.Hex(), checkIn.UTC().Format(time.RFC3339), err)
+	}
+
+	return booking, nil
+}
+
+func (b *bookingRepo) FindByGuestIdAndBookingNumber(ctx context.Context, guestId bson.ObjectID, bookingNumber string) (documents.Booking, error) {
+	if err := validation.New().
+		NotNilObjectID("guestId", guestId).
+		NotBlank("bookingNumber", bookingNumber).
+		Validate(); err != nil {
+		return documents.Booking{}, err
+	}
+
+	bookingID, err := bson.ObjectIDFromHex(bookingNumber)
+	if err != nil {
+		return documents.Booking{}, fmt.Errorf("%w: invalid booking number %q: %v",
+			dbErrors.ErrBookingRepo, bookingNumber, err)
+	}
+
+	filter := bson.M{
+		"_id":        bookingID,
+		"main_guest": guestId,
+	}
+
+	var booking documents.Booking
+	if err := b.collection.FindOne(ctx, filter).Decode(&booking); err != nil {
+		return documents.Booking{}, fmt.Errorf("%w: could not find booking for guestId=%s and bookingNumber=%s: %v",
+			dbErrors.ErrBookingRepo, guestId.Hex(), bookingNumber, err)
+	}
+
+	return booking, nil
 }

@@ -39,6 +39,7 @@ const (
 	SystemNotification_BREAKFAST_READY SystemNotification = 5
 	// Checkout reminder for next day.
 	SystemNotification_CHECK_OUT_TOMORROW SystemNotification = 6
+	SystemNotification_CHECK_OUT_COMPLETE SystemNotification = 7
 )
 
 // Enum value maps for SystemNotification.
@@ -51,6 +52,7 @@ var (
 		4: "PREPARE_COTTAGE_TO_SLEEP",
 		5: "BREAKFAST_READY",
 		6: "CHECK_OUT_TOMORROW",
+		7: "CHECK_OUT_COMPLETE",
 	}
 	SystemNotification_value = map[string]int32{
 		"SYSTEM_NOTIFICATION_UNSPECIFIED": 0,
@@ -60,6 +62,7 @@ var (
 		"PREPARE_COTTAGE_TO_SLEEP":        4,
 		"BREAKFAST_READY":                 5,
 		"CHECK_OUT_TOMORROW":              6,
+		"CHECK_OUT_COMPLETE":              7,
 	}
 )
 
@@ -156,7 +159,7 @@ var File_lodging_system_proto protoreflect.FileDescriptor
 const file_lodging_system_proto_rawDesc = "" +
 	"\n" +
 	"\x14lodging/system.proto\x12\n" +
-	"lodging.v1*\xc3\x01\n" +
+	"lodging.v1*\xdb\x01\n" +
 	"\x12SystemNotification\x12#\n" +
 	"\x1fSYSTEM_NOTIFICATION_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10BOOKING_CHECKING\x10\x01\x12\x15\n" +
@@ -164,7 +167,8 @@ const file_lodging_system_proto_rawDesc = "" +
 	"\fDINNER_READY\x10\x03\x12\x1c\n" +
 	"\x18PREPARE_COTTAGE_TO_SLEEP\x10\x04\x12\x13\n" +
 	"\x0fBREAKFAST_READY\x10\x05\x12\x16\n" +
-	"\x12CHECK_OUT_TOMORROW\x10\x06*\x90\x01\n" +
+	"\x12CHECK_OUT_TOMORROW\x10\x06\x12\x16\n" +
+	"\x12CHECK_OUT_COMPLETE\x10\a*\x90\x01\n" +
 	"\rSystemRequest\x12\x1e\n" +
 	"\x1aSYSTEM_REQUEST_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10REQUEST_DOCUMENT\x10\x01\x12\x1a\n" +

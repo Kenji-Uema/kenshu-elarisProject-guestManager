@@ -12,8 +12,8 @@ type CottageAvailablePeriod struct {
 }
 
 type Period struct {
-	start time.Time
-	end   time.Time
+	Start time.Time
+	End   time.Time
 }
 
 func NewPeriod(start, end time.Time) (Period, error) {

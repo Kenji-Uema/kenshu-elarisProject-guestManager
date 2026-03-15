@@ -8,6 +8,7 @@ type Cottage struct {
 	Id            bson.ObjectID   `bson:"_id,omitempty"`
 	Name          string          `bson:"name"`
 	View          string          `bson:"view"`
+	Cleaned       bool            `bson:"cleaned"`
 	Details       CottageDetails  `bson:"details"`
 	Photos        []string        `bson:"photos"`
 	PricePerNight float32         `bson:"price_per_night"`

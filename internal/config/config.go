@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"log/slog"
 
 	"github.com/caarlos0/env/v11"
@@ -16,6 +17,7 @@ type Configs struct {
 	AppConfig
 	MongoConfig
 	RabbitMqConfig
+	RedisConfig
 	ClockEmuConfig
 	GuestCollectionConfig
 	CottageCollectionConfig
@@ -43,6 +45,14 @@ type RabbitMqConfig struct {
 	Password Secret `env:"RABBITMQ_PASSWORD,required"`
 	Host     string `env:"RABBITMQ_HOST,required"`
 	Port     int    `env:"RABBITMQ_PORT,required"`
+}
+
+type RedisConfig struct {
+	Username string `env:"REDIS_USERNAME" envDefault:""`
+	Password Secret `env:"REDIS_PASSWORD" envDefault:""`
+	Host     string `env:"REDIS_HOST,required" envDefault:"localhost"`
+	Port     int    `env:"REDIS_PORT,required" envDefault:"6379"`
+	DB       int    `env:"REDIS_DB" envDefault:"0"`
 }
 
 type ClockEmuConfig struct {
@@ -85,7 +95,7 @@ func LoadConfigs() (Configs, error) {
 		return cfg, err
 	}
 
-	slog.Info("config loaded", "config", cfg)
+	slog.InfoContext(context.Background(), "config loaded", "config", cfg)
 
 	return cfg, nil
 }

@@ -46,7 +46,7 @@ func (r *RabbitMqChannel) openChannel() error {
 }
 
 func (r *RabbitMqChannel) reopenChannel(ctx context.Context) error {
-	slog.Warn("channel is closed, opening a new one")
+	slog.WarnContext(ctx, "channel is closed, opening a new one")
 
 	if err := r.openChannel(); err != nil {
 		slog.ErrorContext(ctx, "failed to open channel", "error", err)

@@ -5,6 +5,7 @@ import (
 
 	"github.com/Kenji-Uema/guestManager/internal/infra/mdb"
 	"github.com/Kenji-Uema/guestManager/internal/infra/mq"
+	redisc "github.com/Kenji-Uema/guestManager/internal/infra/redis"
 	"github.com/gin-gonic/gin"
 )
 
@@ -16,10 +17,11 @@ type ProbeHandler interface {
 type probeHandler struct {
 	mongoClient        *mdb.Mdb
 	rabbitmqConnection *mq.RabbitMqConnection
+	redisClient        *redisc.Redis
 }
 
-func NewProbeHandler(mongoClient *mdb.Mdb, rabbitmqConnection *mq.RabbitMqConnection) ProbeHandler {
-	return &probeHandler{mongoClient: mongoClient, rabbitmqConnection: rabbitmqConnection}
+func NewProbeHandler(mongoClient *mdb.Mdb, rabbitmqConnection *mq.RabbitMqConnection, redisClient *redisc.Redis) ProbeHandler {
+	return &probeHandler{mongoClient: mongoClient, rabbitmqConnection: rabbitmqConnection, redisClient: redisClient}
 }
 
 func (p probeHandler) Heath(c *gin.Context) {
@@ -33,6 +35,11 @@ func (p probeHandler) Ready(c *gin.Context) {
 	}
 
 	if !p.rabbitmqConnection.IsConnectionOpen() {
+		c.Status(http.StatusServiceUnavailable)
+		return
+	}
+
+	if err := p.redisClient.Ping(c.Request.Context()); err != nil {
 		c.Status(http.StatusServiceUnavailable)
 		return
 	}

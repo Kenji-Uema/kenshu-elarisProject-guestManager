@@ -67,3 +67,114 @@ func Test_bookingRepo_FindByGuestId_ValidatesInput(t *testing.T) {
 		}
 	})
 }
+
+func Test_bookingRepo_FindByGuestIdAndCheckIn_ReturnsBooking(t *testing.T) {
+	setupAndRun("bookingRepo_FindByGuestIdAndCheckIn returns booking", t, func(t *testing.T, ct *mongo.Collection, br *mongo.Collection, gr *mongo.Collection) {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		guestID, err := bson.ObjectIDFromHex("64b6f7c2c0f1e84c0a1a9c01")
+		if err != nil {
+			t.Fatalf("failed to parse hex id: %v", err)
+		}
+		checkIn := time.Date(2024, 6, 1, 15, 0, 0, 0, time.UTC)
+
+		r := &bookingRepo{collection: br}
+		booking, err := r.FindByGuestIdAndCheckIn(ctx, guestID, checkIn)
+		if err != nil {
+			t.Fatalf("FindByGuestIdAndCheckIn() unexpected error: %v", err)
+		}
+
+		if booking.CottageName != "Lake House" {
+			t.Fatalf("FindByGuestIdAndCheckIn() unexpected cottage name: %+v", booking)
+		}
+	})
+}
+
+func Test_bookingRepo_FindByGuestIdAndCheckIn_ReturnsErrorWhenNone(t *testing.T) {
+	setupAndRun("bookingRepo_FindByGuestIdAndCheckIn returns error when none", t, func(t *testing.T, ct *mongo.Collection, br *mongo.Collection, gr *mongo.Collection) {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		r := &bookingRepo{collection: br}
+		_, err := r.FindByGuestIdAndCheckIn(ctx, bson.NewObjectID(), time.Date(2024, 6, 1, 15, 0, 0, 0, time.UTC))
+		if err == nil {
+			t.Fatal("FindByGuestIdAndCheckIn() expected error, got nil")
+		}
+	})
+}
+
+func Test_bookingRepo_FindByGuestIdAndCheckIn_ValidatesInput(t *testing.T) {
+	setupAndRun("bookingRepo_FindByGuestIdAndCheckIn validates input", t, func(t *testing.T, ct *mongo.Collection, br *mongo.Collection, gr *mongo.Collection) {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		r := &bookingRepo{collection: br}
+		_, err := r.FindByGuestIdAndCheckIn(ctx, bson.NilObjectID, time.Time{})
+
+		var validationErr *validationErrors.ErrValidationConstrain
+		if !errors.As(err, &validationErr) {
+			t.Fatalf("FindByGuestIdAndCheckIn() expected validation error, got %v", err)
+		}
+	})
+}
+
+func Test_bookingRepo_FindBookingByCheckInDate_ReturnsBookings(t *testing.T) {
+	setupAndRun("bookingRepo_FindBookingByCheckInDate returns bookings", t, func(t *testing.T, ct *mongo.Collection, br *mongo.Collection, gr *mongo.Collection) {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		r := &bookingRepo{collection: br}
+		bookings, err := r.FindByCheckInDate(ctx, time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC))
+		if err != nil {
+			t.Fatalf("FindByCheckInDate() unexpected error: %v", err)
+		}
+
+		if len(bookings) != 1 {
+			t.Fatalf("FindByCheckInDate() expected 1 booking, got %d", len(bookings))
+		}
+
+		expectedID, err := bson.ObjectIDFromHex("64b6f7c2c0f1e84c0a1a9d01")
+		if err != nil {
+			t.Fatalf("failed to parse expected booking id: %v", err)
+		}
+		if bookings[0].Id != expectedID {
+			t.Fatalf("FindByCheckInDate() expected id %s, got %s", expectedID.Hex(), bookings[0].Id.Hex())
+		}
+		if bookings[0].CottageName != "Lake House" {
+			t.Fatalf("FindByCheckInDate() unexpected cottage name: %+v", bookings[0])
+		}
+	})
+}
+
+func Test_bookingRepo_FindBookingByCheckInDate_ReturnsEmptyWhenNone(t *testing.T) {
+	setupAndRun("bookingRepo_FindBookingByCheckInDate returns empty when none", t, func(t *testing.T, ct *mongo.Collection, br *mongo.Collection, gr *mongo.Collection) {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		r := &bookingRepo{collection: br}
+		bookings, err := r.FindByCheckInDate(ctx, time.Date(2024, 7, 1, 0, 0, 0, 0, time.UTC))
+		if err != nil {
+			t.Fatalf("FindByCheckInDate() unexpected error: %v", err)
+		}
+
+		if len(bookings) != 0 {
+			t.Fatalf("FindByCheckInDate() expected empty result, got %d", len(bookings))
+		}
+	})
+}
+
+func Test_bookingRepo_FindBookingByCheckInDate_ValidatesInput(t *testing.T) {
+	setupAndRun("bookingRepo_FindBookingByCheckInDate validates input", t, func(t *testing.T, ct *mongo.Collection, br *mongo.Collection, gr *mongo.Collection) {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		r := &bookingRepo{collection: br}
+		_, err := r.FindByCheckInDate(ctx, time.Time{})
+
+		var validationErr *validationErrors.ErrValidationConstrain
+		if !errors.As(err, &validationErr) {
+			t.Fatalf("FindByCheckInDate() expected validation error, got %v", err)
+		}
+	})
+}

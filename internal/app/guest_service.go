@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/Kenji-Uema/guestManager/internal/domain"
 	"github.com/Kenji-Uema/guestManager/internal/domain/errors/validationErrors"
@@ -17,6 +18,7 @@ type GuestService interface {
 	Add(ctx context.Context, guest domain.Guest) (bson.ObjectID, error)
 	Update(ctx context.Context, id bson.ObjectID, guest domain.Guest) (domain.Guest, error)
 	GetBookings(ctx context.Context, guestId bson.ObjectID) ([]domain.Booking, error)
+	GetBookingByDate(ctx context.Context, document string, date time.Time) (domain.Booking, error)
 }
 
 type guestService struct {
@@ -123,4 +125,56 @@ func (s *guestService) GetBookings(ctx context.Context, guestId bson.ObjectID) (
 	}
 
 	return bookings, err
+}
+
+func (s *guestService) GetBookingByDate(ctx context.Context, document string, date time.Time) (domain.Booking, error) {
+	guest, err := s.GetByDocument(ctx, document)
+
+	if err != nil {
+		return domain.Booking{}, fmt.Errorf("failed to find guest %s: %w", document, err)
+	}
+
+	allBookings, err := s.bookingRepo.FindByGuestId(ctx, guest.Id)
+	if err != nil {
+		return domain.Booking{}, fmt.Errorf("failed to find allBookings for guest %s: %w", document, err)
+	}
+
+	startOfDay := func(t time.Time) time.Time {
+		y, m, d := t.Date()
+		return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
+	}
+
+	todayStart := startOfDay(date)
+	bookingIdx := -1
+
+	for i := range allBookings {
+		if startOfDay(allBookings[i].StayPeriod.Start).Equal(todayStart) {
+			bookingIdx = i
+			break
+		}
+	}
+
+	if bookingIdx == -1 {
+		return domain.Booking{}, fmt.Errorf("no booking starting today for guest %s", document)
+	}
+
+	selectedBooking := allBookings[bookingIdx]
+
+	stayPeriod, err := domain.NewPeriod(selectedBooking.StayPeriod.Start, selectedBooking.StayPeriod.End)
+	if err != nil {
+		return domain.Booking{}, fmt.Errorf("map booking stay period for guest %s: %w", document, err)
+	}
+
+	booking, err := domain.NewBooking(
+		selectedBooking.MainGuest,
+		selectedBooking.NumberOfGuests,
+		stayPeriod,
+		selectedBooking.CottageName,
+		selectedBooking.Status,
+	)
+	if err != nil {
+		return domain.Booking{}, fmt.Errorf("map booking to domain for guest %s: %w", document, err)
+	}
+
+	return booking, nil
 }

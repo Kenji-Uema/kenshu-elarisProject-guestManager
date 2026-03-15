@@ -8,7 +8,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-var _ port.MqProducer = (*FakeMqProducer)(nil)
+var _ port.MqPublisher = (*FakeMqProducer)(nil)
 
 type FakeMqProducer struct {
 	DeclareExchangeFn func(config config.ExchangeConfig) error

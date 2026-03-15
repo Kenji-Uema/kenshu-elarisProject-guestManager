@@ -10,6 +10,7 @@ import (
 	"github.com/Kenji-Uema/guestManager/internal/config"
 	"github.com/Kenji-Uema/guestManager/internal/infra/mdb"
 	"github.com/Kenji-Uema/guestManager/internal/infra/mq"
+	redisinfra "github.com/Kenji-Uema/guestManager/internal/infra/redis"
 	"github.com/Kenji-Uema/guestManager/internal/infra/telemetry"
 	"github.com/Kenji-Uema/guestManager/internal/transport/grpc/clock"
 	transporthttp "github.com/Kenji-Uema/guestManager/internal/transport/http"
@@ -60,6 +61,15 @@ func BuildApp(ctx context.Context, cfg config.Configs) (*App, error) {
 		return mongoDb.Close(closeCtx)
 	})
 
+	redisClient, err := redisinfra.NewRedisClient(ctx, cfg.RedisConfig)
+	if err != nil {
+		_ = runCleanup(ctx, cleanup)
+		return nil, fmt.Errorf("init redis: %w", err)
+	}
+	cleanup = append(cleanup, func(context.Context) error {
+		return redisClient.Close()
+	})
+
 	clockEmu, err := clock.NewClockEmu(cfg.ClockEmuConfig)
 	if err != nil {
 		_ = runCleanup(ctx, cleanup)
@@ -75,12 +85,16 @@ func BuildApp(ctx context.Context, cfg config.Configs) (*App, error) {
 
 	cleaningService := app.NewCleaningService(cleaningPublisher)
 	guestService := app.NewGuestService(guestRepo, bookingRepo)
-	receptionService := app.NewReceptionService(guestService, cleaningService, cottageRepo, bookingRepo)
+	receptionService, err := app.NewReceptionService(guestService, cleaningService, cottageRepo, bookingRepo, nil, redisClient)
+	if err != nil {
+		_ = runCleanup(ctx, cleanup)
+		return nil, fmt.Errorf("create reception service: %w", err)
+	}
 
 	cleaningHandler := transporthttp.NewCleaningHandler(cleaningService)
 	guestHandler := transporthttp.NewGuestHandler(guestService, clockEmu)
 	receptionHandler := transporthttp.NewReceptionHandler(receptionService)
-	probeHandler := transporthttp.NewProbeHandler(mongoDb, rabbitmqClient)
+	probeHandler := transporthttp.NewProbeHandler(mongoDb, rabbitmqClient, redisClient)
 
 	router := gin.Default()
 	router.Use(gin.Recovery())

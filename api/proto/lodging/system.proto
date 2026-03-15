@@ -19,6 +19,8 @@ enum SystemNotification {
   BREAKFAST_READY = 5;
   // Checkout reminder for next day.
   CHECK_OUT_TOMORROW = 6;
+
+  CHECK_OUT_COMPLETE = 7;
 }
 
 // Requests sent by the system that require guest data/action.

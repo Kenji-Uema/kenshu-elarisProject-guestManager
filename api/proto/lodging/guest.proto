@@ -9,28 +9,34 @@ enum GuestAction {
   GUEST_ACTION_UNSPECIFIED = 0;
   // Guest arrives to start check-in.
   SHOW_FOR_CHECKIN = 1;
+
+  SHOW_DOCUMENT = 2;
+  SHOW_BOOKING_NUMBER = 3;
   // Guest enters the assigned cottage.
-  ENTER_COTTAGE = 2;
+  ENTER_COTTAGE = 4;
   // Guest leaves the assigned cottage.
-  LEAVE_COTTAGE = 3;
+  LEAVE_COTTAGE = 5;
   // Guest leaves cottage to use bath facilities.
-  GO_FOR_A_BATH = 4;
+  GO_FOR_A_BATH = 6;
   // Guest comes back from bath facilities.
-  RETURN_FROM_BATH = 5;
+  RETURN_FROM_BATH = 7;
   // Guest goes to dinner.
-  GO_FOR_DINNER = 6;
+  GO_FOR_DINNER = 8;
   // Guest goes to breakfast.
-  GO_FOR_BREAKFAST = 7;
+  GO_FOR_BREAKFAST = 9;
   // Guest goes to sleep.
-  GO_TO_SLEEP = 8;
+  GO_TO_SLEEP = 10;
   // Guest wakes up.
-  WAKEUP = 9;
+  WAKEUP = 11;
   // Guest notifies they are leaving for cleanup.
-  LEAVE_CLEANUP_NOTIFICATION = 10;
+  LEAVE_CLEANUP_NOTIFICATION = 12;
   // Guest stays in resort common areas.
-  ENJOY_RESORT = 11;
+  ENJOY_RESORT = 13;
   // Guest proceeds to checkout process.
-  PROCEED_TO_CHECKOUT = 12;
+  PROCEED_TO_CHECKOUT = 14;
+
+  RETURN_COTTAGE_KEY = 15;
+  TAKE_COTTAGE_KEY = 16;
 }
 
 // Data supplied by a guest in response to a system request.

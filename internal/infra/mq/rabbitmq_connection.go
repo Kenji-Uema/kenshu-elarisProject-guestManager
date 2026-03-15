@@ -99,7 +99,7 @@ func (c *RabbitMqConnection) reconnectLocked() error {
 		}
 
 		lastErr = err
-		slog.Warn("rabbitmq dial failed", "attempt", attempt, "max_attempts", rabbitDialAttempts, "error", err)
+		slog.WarnContext(context.Background(), "rabbitmq dial failed", "attempt", attempt, "max_attempts", rabbitDialAttempts, "error", err)
 		if attempt < rabbitDialAttempts {
 			time.Sleep(rabbitDialBackoff)
 		}

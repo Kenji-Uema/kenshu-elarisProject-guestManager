@@ -8,6 +8,7 @@ type Cottage struct {
 	Id            bson.ObjectID
 	Name          string
 	View          string
+	Cleaned       bool
 	Details       CottageDetails
 	Photos        []string
 	PricePerNight float32

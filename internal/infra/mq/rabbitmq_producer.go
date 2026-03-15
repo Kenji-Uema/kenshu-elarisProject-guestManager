@@ -25,7 +25,7 @@ type rabbitmqProducer struct {
 	publishConfig config.PublishConfig
 }
 
-func NewRabbitmqProducer(rabbitmqConnection *RabbitMqConnection, publishConfig config.PublishConfig) (port.MqProducer, error) {
+func NewRabbitmqProducer(rabbitmqConnection *RabbitMqConnection, publishConfig config.PublishConfig) (port.MqPublisher, error) {
 	paymentProducer := rabbitmqProducer{
 		RabbitMqChannel: NewRabbitMqChannel(rabbitmqConnection),
 		publishConfig:   publishConfig,
@@ -42,7 +42,7 @@ func (p *rabbitmqProducer) DeclareExchange(config config.ExchangeConfig) error {
 	p.exchangeName = config.Name
 	p.exchangeKind = config.Kind
 	if config.Kind == "" {
-		slog.Warn("exchange kind not specified, defaulting to 'direct'")
+		slog.WarnContext(context.Background(), "exchange kind not specified, defaulting to 'direct'")
 		p.exchangeKind = "direct"
 	}
 

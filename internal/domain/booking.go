@@ -7,38 +7,38 @@ import (
 )
 
 type Booking struct {
-	mainGuest      bson.ObjectID
-	numberOfGuests int
-	stayPeriod     Period
-	cottageName    string
-	status         string
+	MainGuest      bson.ObjectID
+	NumberOfGuests int
+	StayPeriod     Period
+	CottageName    string
+	Status         string
 }
 
 func NewBooking(mainGuest bson.ObjectID, numberOfGuests int, stayPeriod Period, cottageName string, status string) (Booking, error) {
-	if err := validation.New().PositiveValue("numberOfGuests", numberOfGuests).
-		NotZeroValue("stayPeriod", stayPeriod).
-		NotBlank("cottageName", cottageName).
-		NotBlank("status", status).Validate(); err != nil {
+	if err := validation.New().PositiveValue("NumberOfGuests", numberOfGuests).
+		NotZeroValue("StayPeriod", stayPeriod).
+		NotBlank("CottageName", cottageName).
+		NotBlank("Status", status).Validate(); err != nil {
 		return Booking{}, err
 	}
 
 	return Booking{
-		mainGuest:      mainGuest,
-		numberOfGuests: numberOfGuests,
-		stayPeriod:     stayPeriod,
-		cottageName:    cottageName,
-		status:         status,
+		MainGuest:      mainGuest,
+		NumberOfGuests: numberOfGuests,
+		StayPeriod:     stayPeriod,
+		CottageName:    cottageName,
+		Status:         status,
 	}, nil
 }
 
 func (b *Booking) ToDto() dto.BookingDto {
 	return dto.BookingDto{
-		NumberOfGuests: b.numberOfGuests,
+		NumberOfGuests: b.NumberOfGuests,
 		StayPeriod: dto.Period{
-			Start: b.stayPeriod.start,
-			End:   b.stayPeriod.end,
+			Start: b.StayPeriod.Start,
+			End:   b.StayPeriod.End,
 		},
-		CottageName: b.cottageName,
-		Status:      b.status,
+		CottageName: b.CottageName,
+		Status:      b.Status,
 	}
 }
