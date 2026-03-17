@@ -21,7 +21,7 @@ func NewCheckoutHandler(receptionService app.ReceptionService, writer *message.W
 	return &CheckoutHandler{receptionService: receptionService, writer: writer, reader: reader}
 }
 
-func (h CheckoutHandler) ProcessCheckout(ctx context.Context) error {
+func (h CheckoutHandler) Handle(ctx context.Context) error {
 	now, err := h.clockEmu.Now(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx, "checkin handler: clock emu now", "error", err)

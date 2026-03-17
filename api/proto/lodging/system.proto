@@ -21,6 +21,8 @@ enum SystemNotification {
   CHECK_OUT_TOMORROW = 6;
 
   CHECK_OUT_COMPLETE = 7;
+  // Checkout is due today.
+  CHECK_OUT_TODAY = 8;
 }
 
 // Requests sent by the system that require guest data/action.

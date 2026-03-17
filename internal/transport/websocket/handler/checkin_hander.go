@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/Kenji-Uema/guestManager/internal/app"
+	"github.com/Kenji-Uema/guestManager/internal/domain"
 	"github.com/Kenji-Uema/guestManager/internal/domain/dto"
 	"github.com/Kenji-Uema/guestManager/internal/transport/grpc/clock"
 	"github.com/Kenji-Uema/guestManager/internal/transport/websocket/message"
@@ -36,39 +37,40 @@ func (h CheckinHandler) WaitForGuest(ctx context.Context) error {
 	return nil
 }
 
-func (h CheckinHandler) Handle(ctx context.Context) error {
+func (h CheckinHandler) Handle(ctx context.Context) (domain.Booking, error) {
 	now, err := h.clockEmu.Now(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx, "checkin handler: clock emu now", "error", err)
-		return err
+		return domain.Booking{}, err
 	}
 
 	var documentID string
 	if documentID, err = h.requestDocumentID(ctx); err != nil {
 		slog.ErrorContext(ctx, "checkin handler: request document", "error", err)
-		return err
+		return domain.Booking{}, err
 	}
 
 	slog.InfoContext(ctx, "checkin handler: received document id", "document_id", documentID)
 
 	if err := h.writer.SendSystemNotification(ctx, dto.SystemNotification_BOOKING_CHECKING); err != nil {
 		slog.ErrorContext(ctx, "checkin handler: send notification", "error", err)
-		return err
+		return domain.Booking{}, err
 	}
 
-	if err := h.receptionService.CheckIn(ctx, documentID, *now); err != nil {
+	booking, err := h.receptionService.CheckIn(ctx, documentID, *now)
+	if err != nil {
 		slog.ErrorContext(ctx, "checkin handler: checkin", "error", err)
 
 		var bookingID string
 		if bookingID, err = h.requestBookingID(ctx); err != nil {
 			slog.ErrorContext(ctx, "checkin handler: request booking id", "error", err)
-			return err
+			return domain.Booking{}, err
 		}
 		slog.InfoContext(ctx, "checkin handler: received booking id", "booking_id", bookingID)
 
-		if err = h.receptionService.CheckinFallback(ctx, documentID, bookingID, *now); err != nil {
+		if booking, err = h.receptionService.CheckinFallback(ctx, documentID, bookingID, *now); err != nil {
 			slog.ErrorContext(ctx, "checkin handler: checkin fallback", "error", err)
-			return err
+			return domain.Booking{}, err
 		}
 		slog.InfoContext(ctx, "checkin handler: fallback checkin succeeded")
 	}
@@ -77,15 +79,15 @@ func (h CheckinHandler) Handle(ctx context.Context) error {
 
 	if err := h.writer.SendSystemNotification(ctx, dto.SystemNotification_CHECK_IN_COMPLETE); err != nil {
 		slog.ErrorContext(ctx, "checkin handler: send notification", "error", err)
-		return err
+		return domain.Booking{}, err
 	}
 
 	if _, err := h.giveCottageKey(ctx); err != nil {
 		slog.ErrorContext(ctx, "checkin handler: give cottage key", "error", err)
-		return err
+		return domain.Booking{}, err
 	}
 
-	return nil
+	return booking, nil
 }
 
 func (h CheckinHandler) requestDocumentID(ctx context.Context) (string, error) {

@@ -14,6 +14,7 @@ import (
 	"github.com/Kenji-Uema/guestManager/internal/infra/telemetry"
 	"github.com/Kenji-Uema/guestManager/internal/transport/grpc/clock"
 	transporthttp "github.com/Kenji-Uema/guestManager/internal/transport/http"
+	"github.com/Kenji-Uema/guestManager/internal/transport/websocket"
 	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 )
@@ -32,7 +33,7 @@ func BuildApp(ctx context.Context, cfg config.Configs) (*App, error) {
 	}
 	cleanup = append(cleanup, shutdownTelemetry)
 
-	rabbitmqClient, err := mq.NewRabbitMqConnection(cfg.RabbitMqConfig)
+	rabbitmqClient, err := mq.NewRabbitMqConnection(ctx, cfg.RabbitMqConfig)
 	if err != nil {
 		_ = runCleanup(ctx, cleanup)
 		return nil, fmt.Errorf("create rabbitmq connection: %w", err)
@@ -41,13 +42,17 @@ func BuildApp(ctx context.Context, cfg config.Configs) (*App, error) {
 		return rabbitmqClient.Close()
 	})
 
-	cleaningPublisher, err := mq.NewRabbitMqPublisher(rabbitmqClient, cfg.CleaningExchangeConfig)
+	cleaningPublisher, err := mq.NewRabbitmqProducer(rabbitmqClient, config.PublishConfig{})
 	if err != nil {
 		_ = runCleanup(ctx, cleanup)
 		return nil, fmt.Errorf("create rabbitmq publisher: %w", err)
 	}
+	if err := cleaningPublisher.DeclareExchange(cfg.CleaningExchangeConfig); err != nil {
+		_ = runCleanup(ctx, cleanup)
+		return nil, fmt.Errorf("declare cleaning exchange: %w", err)
+	}
 	cleanup = append(cleanup, func(context.Context) error {
-		return cleaningPublisher.Close()
+		return cleaningPublisher.CloseChannel()
 	})
 
 	mongoDb, err := mdb.NewMongoDb(ctx, cfg.MongoConfig)
@@ -83,9 +88,18 @@ func BuildApp(ctx context.Context, cfg config.Configs) (*App, error) {
 	bookingRepo := mdb.NewBookingRepo(mongoDb.Database, cfg.BookingCollectionConfig)
 	cottageRepo := mdb.NewCottageRepo(mongoDb.Database, cfg.CottageCollectionConfig)
 
+	clockEventConsumer, err := mq.NewRabbitmqConsumer(rabbitmqClient, config.ConsumeConfig{})
+	if err != nil {
+		_ = runCleanup(ctx, cleanup)
+		return nil, fmt.Errorf("create rabbitmq consumer: %w", err)
+	}
+	cleanup = append(cleanup, func(context.Context) error {
+		return clockEventConsumer.CloseChannel()
+	})
+
 	cleaningService := app.NewCleaningService(cleaningPublisher)
 	guestService := app.NewGuestService(guestRepo, bookingRepo)
-	receptionService, err := app.NewReceptionService(guestService, cleaningService, cottageRepo, bookingRepo, nil, redisClient)
+	receptionService, err := app.NewReceptionService(guestService, cleaningService, cottageRepo, bookingRepo, clockEventConsumer, redisClient)
 	if err != nil {
 		_ = runCleanup(ctx, cleanup)
 		return nil, fmt.Errorf("create reception service: %w", err)
@@ -93,13 +107,13 @@ func BuildApp(ctx context.Context, cfg config.Configs) (*App, error) {
 
 	cleaningHandler := transporthttp.NewCleaningHandler(cleaningService)
 	guestHandler := transporthttp.NewGuestHandler(guestService, clockEmu)
-	receptionHandler := transporthttp.NewReceptionHandler(receptionService)
+	wsServer := websocket.NewWebsocket(receptionService, nil, nil)
 	probeHandler := transporthttp.NewProbeHandler(mongoDb, rabbitmqClient, redisClient)
 
 	router := gin.Default()
 	router.Use(gin.Recovery())
 	router.Use(otelgin.Middleware(cfg.AppConfig.ServiceName))
-	registerRoutes(router, guestHandler, cleaningHandler, receptionHandler, probeHandler)
+	registerRoutes(router, guestHandler, cleaningHandler, wsServer, probeHandler)
 
 	return &App{Router: router, cleanup: cleanup}, nil
 }
@@ -119,18 +133,16 @@ func runCleanup(ctx context.Context, cleanup []func(context.Context) error) erro
 }
 
 func registerRoutes(router *gin.Engine, guestHandler transporthttp.GuestHandler, cleaningHandler transporthttp.CleaningHandler,
-	receptionHandler transporthttp.ReceptionHandler, probeHandler transporthttp.ProbeHandler) {
+	websocket websocket.Ws, probeHandler transporthttp.ProbeHandler) {
 	router.GET("/guest/:userId", guestHandler.GetGuest)
 	router.GET("/guest/:userId/bookings", guestHandler.GetBookings)
 	router.POST("/guest", guestHandler.AddGuest)
 	router.PATCH("/guest/:userId", guestHandler.UpdateGuest)
 
-	router.POST("/checkin/:userId/reservation/:reservationId", receptionHandler.CheckIn)
-	router.POST("/checkout/:userId/reservation/:reservationId", receptionHandler.CheckOut)
-
 	router.POST("/clean/:roomNumber", cleaningHandler.CleanRoom)
 
 	router.POST("/consume/:roomNumber/item/:itemName", nil)
+	router.GET("/lodging/chat", websocket.Handle)
 
 	router.GET("/healthz", probeHandler.Heath)
 	router.GET("/readyz", probeHandler.Ready)

@@ -15,9 +15,9 @@ import (
 )
 
 type ReceptionService interface {
-	CheckIn(ctx context.Context, guestDocument string, today time.Time) error
+	CheckIn(ctx context.Context, guestDocument string, today time.Time) (domain.Booking, error)
 	CheckOut(ctx context.Context, guestDocument string, today time.Time) error
-	CheckinFallback(ctx context.Context, document string, bookingNumber string, today time.Time) error
+	CheckinFallback(ctx context.Context, document string, bookingNumber string, today time.Time) (domain.Booking, error)
 }
 
 type receptionService struct {
@@ -56,42 +56,42 @@ func NewReceptionService(guestService GuestService, cleaningService CleaningServ
 	}, nil
 }
 
-func (r receptionService) CheckIn(ctx context.Context, document string, today time.Time) error {
+func (r receptionService) CheckIn(ctx context.Context, document string, today time.Time) (domain.Booking, error) {
 	guest, err := r.guestService.GetByDocument(ctx, document)
 	if err != nil {
-		return fmt.Errorf("failed to get guest %s: %w", document, err)
+		return domain.Booking{}, fmt.Errorf("failed to get guest %s: %w", document, err)
 	}
 
 	booking, err := r.getFromCache(ctx, today, err, guest)
 	if err != nil || booking == (domain.Booking{}) {
 		booking, err = r.guestService.GetBookingByDate(ctx, document, today)
 		if err != nil {
-			return fmt.Errorf("failed to get booking for guest %s: %w", document, err)
+			return domain.Booking{}, fmt.Errorf("failed to get booking for guest %s: %w", document, err)
 		}
 	}
 
 	if booking == (domain.Booking{}) {
-		return fmt.Errorf("no booking found for guest %s", document)
+		return domain.Booking{}, fmt.Errorf("no booking found for guest %s", document)
 	}
 
 	if err := r.processCheckIn(ctx, document, booking, guest); err != nil {
-		return err
+		return domain.Booking{}, err
 	}
-	return nil
+	return booking, nil
 }
 
-func (r receptionService) CheckinFallback(ctx context.Context, document string, bookingNumber string, today time.Time) error {
+func (r receptionService) CheckinFallback(ctx context.Context, document string, bookingNumber string, today time.Time) (domain.Booking, error) {
 	guest, err := r.guestService.GetByDocument(ctx, document)
 	if err != nil {
-		return fmt.Errorf("failed to get guest %s: %w", document, err)
+		return domain.Booking{}, fmt.Errorf("failed to get guest %s: %w", document, err)
 	}
 
 	bookingDoc, err := r.bookingRepo.FindByGuestIdAndBookingNumber(ctx, guest.Id, bookingNumber)
 	if err != nil {
-		return fmt.Errorf("failed to get booking for guest %s: %w", document, err)
+		return domain.Booking{}, fmt.Errorf("failed to get booking for guest %s: %w", document, err)
 	}
 	if bookingDoc == (documents.Booking{}) {
-		return fmt.Errorf("no booking found for guest %s", document)
+		return domain.Booking{}, fmt.Errorf("no booking found for guest %s", document)
 	}
 
 	startOfDay := func(t time.Time) time.Time {
@@ -99,12 +99,12 @@ func (r receptionService) CheckinFallback(ctx context.Context, document string, 
 		return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
 	}
 	if !startOfDay(bookingDoc.StayPeriod.Start).Equal(startOfDay(today)) {
-		return fmt.Errorf("booking %s is not valid for check-in on %s", bookingNumber, today.UTC().Format("2006-01-02"))
+		return domain.Booking{}, fmt.Errorf("booking %s is not valid for check-in on %s", bookingNumber, today.UTC().Format("2006-01-02"))
 	}
 
 	stayPeriod, err := domain.NewPeriod(bookingDoc.StayPeriod.Start, bookingDoc.StayPeriod.End)
 	if err != nil {
-		return fmt.Errorf("failed to map booking period for guest %s: %w", document, err)
+		return domain.Booking{}, fmt.Errorf("failed to map booking period for guest %s: %w", document, err)
 	}
 
 	booking, err := domain.NewBooking(
@@ -115,13 +115,13 @@ func (r receptionService) CheckinFallback(ctx context.Context, document string, 
 		bookingDoc.Status,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to map booking for guest %s: %w", document, err)
+		return domain.Booking{}, fmt.Errorf("failed to map booking for guest %s: %w", document, err)
 	}
 
 	if err := r.processCheckIn(ctx, document, booking, guest); err != nil {
-		return err
+		return domain.Booking{}, err
 	}
-	return nil
+	return booking, nil
 }
 
 func (r receptionService) CheckOut(ctx context.Context, document string, today time.Time) error {
