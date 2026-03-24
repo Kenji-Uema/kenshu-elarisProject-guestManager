@@ -75,3 +75,65 @@ func Test_cottageRepo_UpdateCurrentGuest_ValidatesInput(t *testing.T) {
 		}
 	})
 }
+
+func Test_cottageRepo_RemovePastBooking_RemovesBookingAndClearsCurrentGuest(t *testing.T) {
+	setupAndRun("cottageRepo_RemovePastBooking removes booking and clears current guest", t, func(t *testing.T, ct *mongo.Collection, br *mongo.Collection, gr *mongo.Collection) {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		r := &cottageRepo{collection: ct}
+		bookingID := bson.ObjectID{0x64, 0xb6, 0xf7, 0xc2, 0xc0, 0xf1, 0xe8, 0x4c, 0x0a, 0x1a, 0x9d, 0x01}
+
+		if err := r.RemovePastBooking(ctx, bookingID); err != nil {
+			t.Fatalf("RemovePastBooking() unexpected error: %v", err)
+		}
+
+		var updated map[string]any
+		if err := ct.FindOne(ctx, bson.M{"name": "Lake House"}).Decode(&updated); err != nil {
+			t.Fatalf("failed to load updated cottage: %v", err)
+		}
+
+		bookings, ok := updated["bookings"].(bson.A)
+		if !ok {
+			t.Fatalf("RemovePastBooking() bookings type = %T, want bson.A", updated["bookings"])
+		}
+		if len(bookings) != 0 {
+			t.Fatalf("RemovePastBooking() bookings = %+v, want empty", bookings)
+		}
+
+		currentGuest := updated["current_guest"].(bson.ObjectID)
+		if currentGuest != bson.NilObjectID {
+			t.Fatalf("RemovePastBooking() current_guest = %s, want nil object id", currentGuest.Hex())
+		}
+	})
+}
+
+func Test_cottageRepo_RemovePastBooking_NotFound(t *testing.T) {
+	setupAndRun("cottageRepo_RemovePastBooking not found", t, func(t *testing.T, ct *mongo.Collection, br *mongo.Collection, gr *mongo.Collection) {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		r := &cottageRepo{collection: ct}
+		err := r.RemovePastBooking(ctx, bson.NewObjectID())
+
+		var notFound *dbErrors.ErrCottageDoesNotExist
+		if !errors.As(err, &notFound) {
+			t.Fatalf("RemovePastBooking() expected ErrCottageDoesNotExist, got %v", err)
+		}
+	})
+}
+
+func Test_cottageRepo_RemovePastBooking_ValidatesInput(t *testing.T) {
+	setupAndRun("cottageRepo_RemovePastBooking validates input", t, func(t *testing.T, ct *mongo.Collection, br *mongo.Collection, gr *mongo.Collection) {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		r := &cottageRepo{collection: ct}
+		err := r.RemovePastBooking(ctx, bson.NilObjectID)
+
+		var validationErr *validationErrors.ErrValidationConstrain
+		if !errors.As(err, &validationErr) {
+			t.Fatalf("RemovePastBooking() expected validation error for bookingId, got %v", err)
+		}
+	})
+}

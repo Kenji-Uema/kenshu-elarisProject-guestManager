@@ -23,20 +23,6 @@ func (v *Validator) EmailFormat(email string) *Validator {
 	return v
 }
 
-func (v *Validator) CleaningRequest(request string) *Validator {
-	v.steps = append(v.steps, func() error {
-		if request != "DO_NOT_DISTURB" && request != "CLEAN" {
-			return &validationErrors.ErrValidationConstrain{
-				Field:   "request",
-				Message: "must be either DO_NOT_DISTURB or CLEAN",
-			}
-		}
-		return nil
-	})
-
-	return v
-}
-
 func (v *Validator) Period(start time.Time, end time.Time) *Validator {
 	v.steps = append(v.steps, func() error {
 		if start.After(end) || start.Equal(end) {

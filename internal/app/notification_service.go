@@ -9,159 +9,101 @@ import (
 	"time"
 
 	"github.com/Kenji-Uema/guestManager/internal/domain"
-	"github.com/Kenji-Uema/guestManager/internal/domain/dto"
 	"github.com/Kenji-Uema/guestManager/internal/infra/redis"
-	"github.com/Kenji-Uema/guestManager/internal/port"
-	amqp "github.com/rabbitmq/amqp091-go"
 	goredis "github.com/redis/go-redis/v9"
-	"google.golang.org/protobuf/proto"
 )
 
 type NotificationService interface {
-	BreakfastNotification(ctx context.Context) <-chan interface{}
-	DinnerNotification(ctx context.Context) <-chan interface{}
-	CheckOutNotification() <-chan []domain.Booking
+	HourNotification(ctx context.Context, timerCh chan interface{}, hour int)
+	CheckOutNotification(ctx context.Context, bookingCh chan []domain.Booking)
 }
 type notificationService struct {
-	hourEventConsumer port.MqConsumer
-	redis             *redis.Redis
+	timeEventService TimeEventService
+	redis            *redis.Redis
 }
 
-func NewNotificationService(consumer port.MqConsumer, redis *redis.Redis) NotificationService {
-	return &notificationService{hourEventConsumer: consumer, redis: redis}
+func NewNotificationService(timeEventService TimeEventService, redis *redis.Redis) NotificationService {
+	return &notificationService{timeEventService: timeEventService, redis: redis}
 }
 
-func (n notificationService) BreakfastNotification(ctx context.Context) <-chan interface{} {
-	return n.consumeHourEvent(ctx, 6)
-}
+func (n notificationService) HourNotification(ctx context.Context, timerCh chan interface{}, hour int) {
+	events := make(chan time.Time, 1)
+	n.timeEventService.Register(TimeEventHourChange, events)
+	defer n.timeEventService.Unregister(TimeEventHourChange, events)
 
-func (n notificationService) DinnerNotification(ctx context.Context) <-chan interface{} {
-	return n.consumeHourEvent(ctx, 18)
-}
-
-func (n notificationService) CheckOutNotification() <-chan []domain.Booking {
-	out := make(chan []domain.Booking)
-	ctx := context.Background()
-
-	go func() {
-		defer close(out)
-
-		events, err := n.hourEventConsumer.Consume(ctx)
-		if err != nil {
-			slog.ErrorContext(ctx, "notification service: consume checkout events", "error", err)
+	for {
+		select {
+		case <-ctx.Done():
+			slog.DebugContext(ctx, "notification service: hour notification context canceled")
 			return
-		}
-
-		for {
-			select {
-			case delivery, ok := <-events:
-				if !ok {
-					return
-				}
-
-				eventTime, err := parseTimeEvent(delivery.Body)
-				if err != nil {
-					n.nackDelivery(ctx, delivery, false)
-					continue
-				}
-
-				tomorrow := eventTime.AddDate(0, 0, 1).UTC().Format("2006-01-02")
-				redisKey := fmt.Sprintf("checkout.%s", tomorrow)
-
-				payload, err := n.redis.Client().Get(ctx, redisKey).Bytes()
-				if err != nil {
-					if errors.Is(err, goredis.Nil) {
-						n.ackDelivery(ctx, delivery)
-						continue
-					}
-					n.nackDelivery(ctx, delivery, true)
-					continue
-				}
-
-				var checkOutBookings []domain.Booking
-				if err := json.Unmarshal(payload, &checkOutBookings); err != nil {
-					n.nackDelivery(ctx, delivery, false)
-					continue
-				}
-
-				select {
-				case out <- checkOutBookings:
-					n.ackDelivery(ctx, delivery)
-				default:
-					n.nackDelivery(ctx, delivery, true)
-				}
-			}
-		}
-	}()
-
-	return out
-}
-
-func (n notificationService) consumeHourEvent(ctx context.Context, targetHour int) <-chan interface{} {
-	out := make(chan interface{})
-
-	go func() {
-		defer close(out)
-
-		events, err := n.hourEventConsumer.Consume(ctx)
-		if err != nil {
-			slog.ErrorContext(ctx, "notification service: consume hour events", "error", err)
-			return
-		}
-
-		for {
-			select {
-			case <-ctx.Done():
+		case eventTime, ok := <-events:
+			if !ok {
+				slog.DebugContext(ctx, "notification service: hour change channel closed")
 				return
-			case delivery, ok := <-events:
-				if !ok {
-					return
-				}
-
-				eventTime, err := parseTimeEvent(delivery.Body)
-				if err != nil {
-					n.nackDelivery(ctx, delivery, false)
-					continue
-				}
-
-				if eventTime.Hour() != targetHour {
-					n.ackDelivery(ctx, delivery)
-					continue
-				}
-
+			}
+			if eventTime.Hour() == hour {
 				select {
-				case out <- eventTime:
-					n.ackDelivery(ctx, delivery)
+				case timerCh <- eventTime:
+					slog.DebugContext(ctx, "notification service: published hour notification",
+						"event_time", eventTime)
 				case <-ctx.Done():
-					n.nackDelivery(ctx, delivery, true)
+					slog.DebugContext(ctx, "notification service: canceled while publishing hour notification",
+						"error", ctx.Err())
 					return
 				}
 			}
 		}
-	}()
-
-	return out
-}
-
-func parseTimeEvent(body []byte) (time.Time, error) {
-	var timeEvent dto.TimeEvent
-	if err := proto.Unmarshal(body, &timeEvent); err != nil {
-		return time.Time{}, err
-	}
-	if timeEvent.GetTime() == nil {
-		return time.Time{}, errors.New("missing time")
-	}
-	return timeEvent.GetTime().AsTime(), nil
-}
-
-func (n notificationService) ackDelivery(ctx context.Context, delivery amqp.Delivery) {
-	if err := delivery.Ack(false); err != nil {
-		slog.ErrorContext(ctx, "notification service: ack delivery", "error", err)
 	}
 }
 
-func (n notificationService) nackDelivery(ctx context.Context, delivery amqp.Delivery, requeue bool) {
-	if err := delivery.Nack(false, requeue); err != nil {
-		slog.ErrorContext(ctx, "notification service: nack delivery", "error", err, "requeue", requeue)
+func (n notificationService) CheckOutNotification(ctx context.Context, bookingCh chan []domain.Booking) {
+	events := make(chan time.Time, 1)
+	n.timeEventService.Register(TimeEventDayChange, events)
+	defer n.timeEventService.Unregister(TimeEventDayChange, events)
+	slog.DebugContext(ctx, "notification service: subscribed to day change notifications for checkout")
+
+	for {
+		select {
+		case <-ctx.Done():
+			slog.DebugContext(ctx, "notification service: checkout notification context canceled",
+				"error", ctx.Err())
+			return
+		case eventTime, ok := <-events:
+			if !ok {
+				slog.DebugContext(ctx, "notification service: day change channel closed for checkout")
+				return
+			}
+
+			redisKey := fmt.Sprintf("checkout.%s", eventTime.AddDate(0, 0, 1).UTC().Format("2006-01-02"))
+
+			payload, err := n.redis.Client().Get(ctx, redisKey).Bytes()
+			if err != nil {
+				if errors.Is(err, goredis.Nil) {
+					slog.DebugContext(ctx, "notification service: no checkout bookings in redis for next day",
+						"redis_key", redisKey, "event_time", eventTime)
+					continue
+				}
+				slog.WarnContext(ctx, "notification service: failed to read checkout bookings from redis",
+					"redis_key", redisKey, "event_time", eventTime, "error", err)
+				continue
+			}
+
+			var checkOutBookings []domain.Booking
+			if err := json.Unmarshal(payload, &checkOutBookings); err != nil {
+				slog.WarnContext(ctx, "notification service: failed to decode checkout bookings from redis",
+					"redis_key", redisKey, "event_time", eventTime, "error", err)
+				continue
+			}
+
+			select {
+			case bookingCh <- checkOutBookings:
+				slog.DebugContext(ctx, "notification service: published checkout notification",
+					"redis_key", redisKey, "event_time", eventTime, "booking_count", len(checkOutBookings))
+			case <-ctx.Done():
+				slog.DebugContext(ctx, "notification service: canceled while publishing checkout notification",
+					"redis_key", redisKey, "error", ctx.Err())
+				return
+			}
+		}
 	}
 }

@@ -7,6 +7,7 @@ import (
 )
 
 type Booking struct {
+	Id             bson.ObjectID
 	MainGuest      bson.ObjectID
 	NumberOfGuests int
 	StayPeriod     Period
@@ -14,8 +15,9 @@ type Booking struct {
 	Status         string
 }
 
-func NewBooking(mainGuest bson.ObjectID, numberOfGuests int, stayPeriod Period, cottageName string, status string) (Booking, error) {
-	if err := validation.New().PositiveValue("NumberOfGuests", numberOfGuests).
+func NewBooking(id bson.ObjectID, mainGuest bson.ObjectID, numberOfGuests int, stayPeriod Period, cottageName string, status string) (Booking, error) {
+	if err := validation.New().NotNilObjectID("Id", id).
+		PositiveValue("NumberOfGuests", numberOfGuests).
 		NotZeroValue("StayPeriod", stayPeriod).
 		NotBlank("CottageName", cottageName).
 		NotBlank("Status", status).Validate(); err != nil {
@@ -23,6 +25,7 @@ func NewBooking(mainGuest bson.ObjectID, numberOfGuests int, stayPeriod Period, 
 	}
 
 	return Booking{
+		Id:             id,
 		MainGuest:      mainGuest,
 		NumberOfGuests: numberOfGuests,
 		StayPeriod:     stayPeriod,

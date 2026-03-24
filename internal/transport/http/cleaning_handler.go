@@ -35,7 +35,7 @@ func (h cleaningHandler) CleanRoom(c *gin.Context) {
 		return
 	}
 
-	cleaningRequest, err := domain.NewCleaningRequest(roomUri.Name, needCleanQuery.Clean)
+	cleaningRequest, err := domain.NewCleaningRequest(roomUri.Name, domain.DailyCleaning)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

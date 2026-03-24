@@ -113,6 +113,7 @@ func (s preArrangeService) bookingsDocToDomain(ctx context.Context, bookingDocs 
 		}
 
 		booking, err := domain.NewBooking(
+			b.Id,
 			b.MainGuest,
 			b.NumberOfGuests,
 			stayPeriod,

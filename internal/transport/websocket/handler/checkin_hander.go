@@ -8,37 +8,38 @@ import (
 	"github.com/Kenji-Uema/guestManager/internal/app"
 	"github.com/Kenji-Uema/guestManager/internal/domain"
 	"github.com/Kenji-Uema/guestManager/internal/domain/dto"
-	"github.com/Kenji-Uema/guestManager/internal/transport/grpc/clock"
-	"github.com/Kenji-Uema/guestManager/internal/transport/websocket/message"
+	"github.com/Kenji-Uema/guestManager/internal/port"
+	"github.com/Kenji-Uema/guestManager/internal/transport/websocket/chat"
 )
 
 type CheckinHandler struct {
 	receptionService app.ReceptionService
-	clockEmu         clock.Emu
-	writer           *message.Writer
-	reader           *message.Reader
+	cleaningService  app.CleaningService
+	clock            port.ClockClient
+	writer           chat.Writer
+	reader           chat.Reader
 }
 
-func NewCheckinHandler(receptionService app.ReceptionService, writer *message.Writer, reader *message.Reader) *CheckinHandler {
-	return &CheckinHandler{receptionService: receptionService, writer: writer, reader: reader}
+func NewCheckinHandler(receptionService app.ReceptionService, cleaningService app.CleaningService,
+	clock port.ClockClient, writer chat.Writer, reader chat.Reader) *CheckinHandler {
+
+	return &CheckinHandler{
+		receptionService: receptionService,
+		cleaningService:  cleaningService,
+		clock:            clock,
+		writer:           writer,
+		reader:           reader,
+	}
 }
 
 var ErrUnexpectedResponse = errors.New("unexpected websocket response payload")
 
-func (h CheckinHandler) WaitForGuest(ctx context.Context) error {
-	msg, err := h.reader.WaitForGuestAction(ctx, dto.GuestAction_SHOW_FOR_CHECKIN)
-	if err != nil {
-		slog.WarnContext(ctx, "wait for SHOW_FOR_CHECKIN", "error", err)
-		return err
+func (h CheckinHandler) Handle(ctx context.Context) (domain.Booking, error) {
+	if err := h.waitForGuest(ctx); err != nil {
+		return domain.Booking{}, err
 	}
 
-	slog.InfoContext(ctx, "received SHOW_FOR_CHECKIN", "message", msg)
-
-	return nil
-}
-
-func (h CheckinHandler) Handle(ctx context.Context) (domain.Booking, error) {
-	now, err := h.clockEmu.Now(ctx)
+	now, err := h.clock.Now(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx, "checkin handler: clock emu now", "error", err)
 		return domain.Booking{}, err
@@ -59,7 +60,7 @@ func (h CheckinHandler) Handle(ctx context.Context) (domain.Booking, error) {
 
 	booking, err := h.receptionService.CheckIn(ctx, documentID, *now)
 	if err != nil {
-		slog.ErrorContext(ctx, "checkin handler: checkin", "error", err)
+		slog.ErrorContext(ctx, "default checkin failed, trying fallback checkin", "error", err)
 
 		var bookingID string
 		if bookingID, err = h.requestBookingID(ctx); err != nil {
@@ -77,6 +78,11 @@ func (h CheckinHandler) Handle(ctx context.Context) (domain.Booking, error) {
 
 	slog.InfoContext(ctx, "checkin handler: checkin succeeded")
 
+	if err := h.prepareCottageForGuest(ctx, err, booking); err != nil {
+		slog.ErrorContext(ctx, "checkin handler: prepare cottage for guest", "error", err)
+		return domain.Booking{}, err
+	}
+
 	if err := h.writer.SendSystemNotification(ctx, dto.SystemNotification_CHECK_IN_COMPLETE); err != nil {
 		slog.ErrorContext(ctx, "checkin handler: send notification", "error", err)
 		return domain.Booking{}, err
@@ -90,8 +96,22 @@ func (h CheckinHandler) Handle(ctx context.Context) (domain.Booking, error) {
 	return booking, nil
 }
 
+func (h CheckinHandler) waitForGuest(ctx context.Context) error {
+	msg, err := h.reader.WaitForGuestAction(ctx, dto.GuestAction_SHOW_FOR_CHECKIN)
+	if err != nil {
+		slog.WarnContext(ctx, "wait for SHOW_FOR_CHECKIN", "error", err)
+		return err
+	}
+
+	slog.InfoContext(ctx, "received SHOW_FOR_CHECKIN", "message", msg)
+
+	return nil
+}
+
 func (h CheckinHandler) requestDocumentID(ctx context.Context) (string, error) {
-	response, err := h.writer.SendSystemRequest(ctx, dto.SystemRequest_REQUEST_DOCUMENT, dto.GuestAction_SHOW_DOCUMENT)
+	response, err := h.writer.SendSystemRequest(ctx, dto.SystemRequest_REQUEST_DOCUMENT, &dto.GuestResponse{
+		Payload: &dto.GuestResponse_ShowDocument{},
+	})
 	if err != nil {
 		return "", err
 	}
@@ -104,7 +124,9 @@ func (h CheckinHandler) requestDocumentID(ctx context.Context) (string, error) {
 }
 
 func (h CheckinHandler) requestBookingID(ctx context.Context) (string, error) {
-	response, err := h.writer.SendSystemRequest(ctx, dto.SystemRequest_REQUEST_BOOKING_NUMBER, dto.GuestAction_SHOW_BOOKING_NUMBER)
+	response, err := h.writer.SendSystemRequest(ctx, dto.SystemRequest_REQUEST_BOOKING_NUMBER, &dto.GuestResponse{
+		Payload: &dto.GuestResponse_ShowBookingNumber{},
+	})
 	if err != nil {
 		return "", err
 	}
@@ -116,8 +138,23 @@ func (h CheckinHandler) requestBookingID(ctx context.Context) (string, error) {
 	return guestResponse.GetShowBookingNumber().GetBookingId(), nil
 }
 
+func (h CheckinHandler) prepareCottageForGuest(ctx context.Context, err error, booking domain.Booking) error {
+	cleaningRequest, err := domain.NewCleaningRequest(booking.CottageName, domain.PrepareForGuest)
+	if err != nil {
+		slog.ErrorContext(ctx, "checkin handler: new cleaning request", "error", err)
+		return err
+	}
+
+	if err := h.cleaningService.CleanRoom(ctx, cleaningRequest); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (h CheckinHandler) giveCottageKey(ctx context.Context) (string, error) {
-	response, err := h.writer.SendSystemRequest(ctx, dto.SystemRequest_GIVE_COTTAGE_KEY, dto.GuestAction_TAKE_COTTAGE_KEY)
+	response, err := h.writer.SendSystemRequest(ctx, dto.SystemRequest_GIVE_COTTAGE_KEY, &dto.GuestResponse{
+		Payload: &dto.GuestResponse_ReceiveCottageKey{},
+	})
 	if err != nil {
 		return "", err
 	}

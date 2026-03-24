@@ -39,7 +39,7 @@ func (r *cottageRepo) GetByName(ctx context.Context, roomName string) (documents
 }
 
 func (r *cottageRepo) UpdateCurrentGuest(ctx context.Context, roomName string, guestId bson.ObjectID) error {
-	if err := validation.New().NotBlank("roomName", roomName).NotNilObjectID("guestId", guestId).Validate(); err != nil {
+	if err := validation.New().NotBlank("roomName", roomName).Validate(); err != nil {
 		return err
 	}
 
@@ -59,22 +59,25 @@ func (r *cottageRepo) UpdateCurrentGuest(ctx context.Context, roomName string, g
 	return nil
 }
 
-func (r *cottageRepo) ClearCurrentGuest(ctx context.Context, roomName string) error {
-	if err := validation.New().NotBlank("roomName", roomName).Validate(); err != nil {
+func (r *cottageRepo) RemovePastBooking(ctx context.Context, bookingId bson.ObjectID) error {
+	if err := validation.New().NotNilObjectID("bookingId", bookingId).Validate(); err != nil {
 		return err
 	}
 
-	filter := bson.M{"name": roomName}
-	update := bson.M{"$set": bson.M{"current_guest": bson.NilObjectID}}
+	filter := bson.M{"bookings": bookingId}
+	update := bson.M{
+		"$pull": bson.M{"bookings": bookingId},
+		"$set":  bson.M{"current_guest": bson.NilObjectID},
+	}
 
 	result, err := r.collection.UpdateOne(ctx, filter, update)
 	if err != nil {
-		return fmt.Errorf("%w: could not clear current guest for the room, roomName=%s: %v",
-			dbErrors.ErrCottageRepo, roomName, err)
+		return fmt.Errorf("%w: could not remove past booking for bookingId=%s: %v",
+			dbErrors.ErrCottageRepo, bookingId.Hex(), err)
 	}
 
 	if result.MatchedCount == 0 {
-		return &dbErrors.ErrCottageDoesNotExist{CottageName: roomName}
+		return &dbErrors.ErrCottageDoesNotExist{CottageName: bookingId.Hex()}
 	}
 
 	return nil

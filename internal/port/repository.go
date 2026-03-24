@@ -18,7 +18,7 @@ type GuestRepo interface {
 type CottageRepo interface {
 	GetByName(ctx context.Context, roomName string) (documents.Cottage, error)
 	UpdateCurrentGuest(ctx context.Context, roomName string, guestId bson.ObjectID) error
-	ClearCurrentGuest(ctx context.Context, roomName string) error
+	RemovePastBooking(ctx context.Context, bookingId bson.ObjectID) error
 }
 
 type BookingRepo interface {

@@ -2,15 +2,14 @@ package app
 
 import (
 	"context"
-	"log/slog"
 
 	"github.com/Kenji-Uema/guestManager/internal/domain"
+	"github.com/Kenji-Uema/guestManager/internal/domain/dto"
 	"github.com/Kenji-Uema/guestManager/internal/port"
 )
 
 type CleaningService interface {
 	CleanRoom(ctx context.Context, r domain.CleaningRequest) error
-	MakeupRoom(ctx context.Context, r domain.CleaningRequest) error
 }
 
 type cleaningService struct {
@@ -22,22 +21,25 @@ func NewCleaningService(publisher port.MqPublisher) CleaningService {
 }
 
 func (c cleaningService) CleanRoom(ctx context.Context, r domain.CleaningRequest) error {
-	message, err := domain.NewRabbitMqMessage(
-		"ex.cleanRoom", r.RoomName(), "application/json", nil)
-	if err != nil {
-		slog.ErrorContext(ctx, "failed to create message", "error", err)
-		return err
+	cleaningRequest := &dto.CleaningRequest{
+		RoomName: r.RoomName,
+		Request:  c.mapCleaningRequestType(r.RequestType),
 	}
 
-	return c.publisher.Publish(ctx, message)
+	return c.publisher.Publish(ctx, cleaningRequest, "")
 }
 
-func (c cleaningService) MakeupRoom(ctx context.Context, r domain.CleaningRequest) error {
-	message, err := domain.NewRabbitMqMessage(
-		"ex.makeupRoom", r.RoomName(), "application/json", nil)
-	if err != nil {
-		return err
+func (c cleaningService) mapCleaningRequestType(cleaningType domain.CleaningRequestType) dto.RequestType {
+	switch cleaningType {
+	case domain.FullCleaning:
+		return dto.RequestType_FULL_CLEANING
+	case domain.DailyCleaning:
+		return dto.RequestType_DAILY_CLEANING
+	case domain.PrepareForSleep:
+		return dto.RequestType_PREPARE_FOR_SLEEP
+	case domain.PrepareForGuest:
+		return dto.RequestType_PREPARE_FOR_GUEST
+	default:
+		return dto.RequestType_UNSPECIFIED
 	}
-
-	return c.publisher.Publish(ctx, message)
 }

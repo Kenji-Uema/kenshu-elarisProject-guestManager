@@ -7,7 +7,7 @@ import (
 	"github.com/Kenji-Uema/guestManager/internal/app"
 	"github.com/Kenji-Uema/guestManager/internal/domain"
 	"github.com/Kenji-Uema/guestManager/internal/domain/dto"
-	"github.com/Kenji-Uema/guestManager/internal/transport/grpc/clock"
+	"github.com/Kenji-Uema/guestManager/internal/port"
 	"github.com/Kenji-Uema/guestManager/internal/transport/http/bindings"
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -22,10 +22,10 @@ type GuestHandler interface {
 
 type guestHandler struct {
 	service     app.GuestService
-	clockClient *clock.Emu
+	clockClient port.ClockClient
 }
 
-func NewGuestHandler(service app.GuestService, clockClient *clock.Emu) GuestHandler {
+func NewGuestHandler(service app.GuestService, clockClient port.ClockClient) GuestHandler {
 	return &guestHandler{service: service, clockClient: clockClient}
 }
 

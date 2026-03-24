@@ -16,7 +16,7 @@ import (
 
 type ReceptionService interface {
 	CheckIn(ctx context.Context, guestDocument string, today time.Time) (domain.Booking, error)
-	CheckOut(ctx context.Context, guestDocument string, today time.Time) error
+	CheckOut(ctx context.Context, booking domain.Booking, today time.Time) error
 	CheckinFallback(ctx context.Context, document string, bookingNumber string, today time.Time) (domain.Booking, error)
 }
 
@@ -108,6 +108,7 @@ func (r receptionService) CheckinFallback(ctx context.Context, document string, 
 	}
 
 	booking, err := domain.NewBooking(
+		bookingDoc.Id,
 		bookingDoc.MainGuest,
 		bookingDoc.NumberOfGuests,
 		stayPeriod,
@@ -124,41 +125,21 @@ func (r receptionService) CheckinFallback(ctx context.Context, document string, 
 	return booking, nil
 }
 
-func (r receptionService) CheckOut(ctx context.Context, document string, today time.Time) error {
-	guest, err := r.guestService.GetByDocument(ctx, document)
-	if err != nil {
-		return fmt.Errorf("failed to get guest %s: %w", document, err)
+func (r receptionService) CheckOut(ctx context.Context, booking domain.Booking, today time.Time) error {
+	if !booking.StayPeriod.End.Equal(today) {
+		return fmt.Errorf("checkout day not today")
 	}
 
-	allBookings, err := r.bookingRepo.FindByGuestId(ctx, guest.Id)
-	if err != nil {
-		return fmt.Errorf("failed to find bookings for guest %s: %w", document, err)
+	cottageName := booking.CottageName
+	if err := r.cottageRepo.RemovePastBooking(ctx, booking.Id); err != nil {
+		return fmt.Errorf("failed to remove past booking for room %s: %w", cottageName, err)
 	}
 
-	startOfDay := func(t time.Time) time.Time {
-		y, m, d := t.Date()
-		return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
+	if err := r.cottageRepo.UpdateCurrentGuest(ctx, cottageName, bson.NilObjectID); err != nil {
+		return fmt.Errorf("failed to update current guest for room %s: %w", cottageName, err)
 	}
 
-	todayStart := startOfDay(today)
-	bookingIdx := -1
-	for i := range allBookings {
-		if startOfDay(allBookings[i].StayPeriod.End).Equal(todayStart) {
-			bookingIdx = i
-			break
-		}
-	}
-
-	if bookingIdx == -1 {
-		return fmt.Errorf("no booking ending today for guest %s", document)
-	}
-
-	cottageName := allBookings[bookingIdx].CottageName
-	if err := r.cottageRepo.ClearCurrentGuest(ctx, cottageName); err != nil {
-		return fmt.Errorf("failed to clear current guest for room %s: %w", cottageName, err)
-	}
-
-	cleaningRequest, err := domain.NewCleaningRequest(cottageName, "CLEAN")
+	cleaningRequest, err := domain.NewCleaningRequest(cottageName, domain.FullCleaning)
 	if err != nil {
 		return fmt.Errorf("failed to create cleaning request for room %s: %w", cottageName, err)
 	}
@@ -191,6 +172,7 @@ func (r receptionService) getFromCache(ctx context.Context, today time.Time, err
 			}
 
 			booking, err = domain.NewBooking(
+				b.Id,
 				b.MainGuest,
 				b.NumberOfGuests,
 				stayPeriod,

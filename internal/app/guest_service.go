@@ -112,6 +112,7 @@ func (s *guestService) GetBookings(ctx context.Context, guestId bson.ObjectID) (
 			return nil, err
 		}
 		booking, err := domain.NewBooking(
+			b.Id,
 			b.MainGuest,
 			b.NumberOfGuests,
 			stayPeriod,
@@ -166,6 +167,7 @@ func (s *guestService) GetBookingByDate(ctx context.Context, document string, da
 	}
 
 	booking, err := domain.NewBooking(
+		selectedBooking.Id,
 		selectedBooking.MainGuest,
 		selectedBooking.NumberOfGuests,
 		stayPeriod,

@@ -10,25 +10,25 @@ import (
 	"github.com/Kenji-Uema/guestManager/internal/app"
 	"github.com/Kenji-Uema/guestManager/internal/domain"
 	"github.com/Kenji-Uema/guestManager/internal/domain/dto"
-	"github.com/Kenji-Uema/guestManager/internal/port"
-	"github.com/Kenji-Uema/guestManager/internal/transport/websocket/message"
-	amqp "github.com/rabbitmq/amqp091-go"
-	"google.golang.org/protobuf/proto"
+	"github.com/Kenji-Uema/guestManager/internal/transport/websocket/chat"
 )
+
+var errDayChangeStreamClosed = errors.New("day change stream closed")
 
 type StayHandler struct {
 	notificationService app.NotificationService
 	cleaningService     app.CleaningService
-	dayChangeEvent      port.MqConsumer
-	writer              *message.Writer
-	reader              *message.Reader
+	timeEventService    app.TimeEventService
+	writer              chat.Writer
+	reader              chat.Reader
 }
 
-func NewStayHandler(notificationService app.NotificationService, dayChangeEvent port.MqConsumer,
-	writer *message.Writer, reader *message.Reader) *StayHandler {
+func NewStayHandler(notificationService app.NotificationService, cleaningService app.CleaningService,
+	timeEventService app.TimeEventService, writer chat.Writer, reader chat.Reader) *StayHandler {
 	return &StayHandler{
 		notificationService: notificationService,
-		dayChangeEvent:      dayChangeEvent,
+		cleaningService:     cleaningService,
+		timeEventService:    timeEventService,
 		writer:              writer,
 		reader:              reader,
 	}
@@ -38,33 +38,34 @@ func (h StayHandler) Handle(ctx context.Context, booking domain.Booking) error {
 	notificationCtx, stopNotifications := context.WithCancel(ctx)
 	defer stopNotifications()
 
-	dayChangeEvents, err := h.dayChangeEvent.Consume(ctx)
-	if err != nil {
-		slog.ErrorContext(ctx, "stay handler: consume day change events", "error", err)
-		return err
-	}
+	dayChangeEvents := make(chan time.Time, 1)
+	h.timeEventService.Register(app.TimeEventDayChange, dayChangeEvents)
+	defer h.timeEventService.Unregister(app.TimeEventDayChange, dayChangeEvents)
 
 	go func() {
-		err := h.NotifyBreakfast(notificationCtx)
+		err := h.notifyBreakfast(notificationCtx)
 		if err != nil {
 			slog.ErrorContext(notificationCtx, "stay handler: notify breakfast", "error", err)
 		}
 	}()
 	go func() {
-		err := h.NotifyDinner(notificationCtx)
+		err := h.notifyDinner(notificationCtx)
 		if err != nil {
 			slog.ErrorContext(notificationCtx, "stay handler: notify dinner", "error", err)
 		}
 	}()
 
-	for {
-		if err := h.PrepareCottageForSleep(ctx, booking.CottageName); err != nil {
-			slog.ErrorContext(ctx, "stay handler: prepare cottage for sleep", "error", err)
-			return err
-		}
+	if err := h.checkInDayRoutine(ctx, booking); err != nil {
+		return err
+	}
 
-		if err := h.CleanCottage(ctx, booking.CottageName); err != nil {
-			slog.ErrorContext(ctx, "stay handler: clean cottage", "error", err)
+	if _, err := h.waitDayChangeEvent(ctx, dayChangeEvents); err != nil {
+		slog.ErrorContext(ctx, "stay handler: wait day change event", "error", err)
+		return err
+	}
+
+	for {
+		if err := h.stayRoutine(ctx, booking); err != nil {
 			return err
 		}
 
@@ -79,12 +80,71 @@ func (h StayHandler) Handle(ctx context.Context, booking domain.Booking) error {
 		}
 	}
 
-	if err := h.NotifyCheckoutToday(ctx); err != nil {
+	if err := h.notifyCheckoutToday(ctx); err != nil {
 		slog.ErrorContext(ctx, "stay handler: notify checkout today", "error", err)
 		return err
 	}
 
 	stopNotifications()
+
+	if err := h.ignoreAction(ctx, dto.GuestAction_LEAVE_COTTAGE); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (h StayHandler) stayRoutine(ctx context.Context, booking domain.Booking) error {
+	if err := h.ignoreAction(ctx, dto.GuestAction_WAKEUP); err != nil {
+		return err
+	}
+
+	if err := h.ignoreAction(ctx, dto.GuestAction_GO_FOR_BREAKFAST); err != nil {
+		return err
+	}
+
+	if err := h.cleanCottage(ctx, booking.CottageName); err != nil {
+		slog.ErrorContext(ctx, "stay handler: clean cottage", "error", err)
+		return err
+	}
+
+	if err := h.ignoreAction(ctx, dto.GuestAction_ENJOY_RESORT); err != nil {
+		return err
+	}
+
+	if err := h.ignoreAction(ctx, dto.GuestAction_GO_FOR_A_BATH); err != nil {
+		return err
+	}
+
+	if err := h.prepareCottageForSleep(ctx, booking.CottageName); err != nil {
+		slog.ErrorContext(ctx, "stay handler: prepare cottage for sleep", "error", err)
+		return err
+	}
+
+	if err := h.ignoreAction(ctx, dto.GuestAction_GO_TO_SLEEP); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (h StayHandler) checkInDayRoutine(ctx context.Context, booking domain.Booking) error {
+	if err := h.ignoreAction(ctx, dto.GuestAction_ENTER_COTTAGE); err != nil {
+		return err
+	}
+
+	if err := h.ignoreAction(ctx, dto.GuestAction_GO_FOR_A_BATH); err != nil {
+		return err
+	}
+
+	if err := h.prepareCottageForSleep(ctx, booking.CottageName); err != nil {
+		slog.ErrorContext(ctx, "stay handler: prepare cottage for sleep", "error", err)
+		return err
+	}
+
+	if err := h.ignoreAction(ctx, dto.GuestAction_GO_TO_SLEEP); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -98,51 +158,25 @@ func isCheckoutToday(booking domain.Booking, timeEvent time.Time) bool {
 		checkout.Day() == today.Day()
 }
 
-func (h StayHandler) waitDayChangeEvent(ctx context.Context, events <-chan amqp.Delivery) (time.Time, error) {
+func (h StayHandler) waitDayChangeEvent(ctx context.Context, events <-chan time.Time) (time.Time, error) {
 	select {
 	case <-ctx.Done():
 		return time.Time{}, ctx.Err()
-	case delivery, ok := <-events:
+	case timeEvent, ok := <-events:
 		if !ok {
-			return time.Time{}, nil
+			return time.Time{}, errDayChangeStreamClosed
 		}
-
-		timeEvent, err := parseDayChangeEvent(delivery.Body)
-		if err != nil {
-			nackDelivery(ctx, delivery, false)
-			return time.Time{}, err
-		}
-
-		ackDelivery(ctx, delivery)
 		return timeEvent, nil
 	}
 }
 
-func parseDayChangeEvent(body []byte) (time.Time, error) {
-	var timeEvent dto.TimeEvent
-	if err := proto.Unmarshal(body, &timeEvent); err != nil {
-		return time.Time{}, err
-	}
-	if timeEvent.GetTime() == nil {
-		return time.Time{}, errors.New("missing time")
-	}
+func (h StayHandler) ignoreAction(ctx context.Context, action dto.GuestAction) error {
+	slog.InfoContext(ctx, "action does not trigger anything, just ack guest action", "action", action)
 
-	return timeEvent.GetTime().AsTime(), nil
+	return h.reader.AckGuestAction(ctx)
 }
 
-func ackDelivery(ctx context.Context, delivery amqp.Delivery) {
-	if err := delivery.Ack(false); err != nil {
-		slog.ErrorContext(ctx, "stay handler: ack delivery", "error", err)
-	}
-}
-
-func nackDelivery(ctx context.Context, delivery amqp.Delivery, requeue bool) {
-	if err := delivery.Nack(false, requeue); err != nil {
-		slog.ErrorContext(ctx, "stay handler: nack delivery", "error", err, "requeue", requeue)
-	}
-}
-
-func (h StayHandler) CleanCottage(ctx context.Context, cottageName string) error {
+func (h StayHandler) cleanCottage(ctx context.Context, cottageName string) error {
 	msg, err := h.reader.WaitForGuestAction(ctx, dto.GuestAction_LEAVE_CLEANUP_NOTIFICATION)
 	if err != nil {
 		slog.WarnContext(ctx, "wait for LEAVE_CLEANUP_NOTIFICATION", "error", err)
@@ -151,7 +185,7 @@ func (h StayHandler) CleanCottage(ctx context.Context, cottageName string) error
 
 	slog.InfoContext(ctx, "received LEAVE_CLEANUP_NOTIFICATION", "message", msg)
 
-	cleaningRequest, err := domain.NewCleaningRequest(cottageName, "clean")
+	cleaningRequest, err := domain.NewCleaningRequest(cottageName, domain.FullCleaning)
 	if err != nil {
 		return err
 	}
@@ -163,16 +197,16 @@ func (h StayHandler) CleanCottage(ctx context.Context, cottageName string) error
 	return nil
 }
 
-func (h StayHandler) PrepareCottageForSleep(ctx context.Context, cottageName string) error {
+func (h StayHandler) prepareCottageForSleep(ctx context.Context, cottageName string) error {
 	msg, err := h.reader.WaitForGuestAction(ctx, dto.GuestAction_GO_FOR_DINNER)
 	if err != nil {
-		slog.WarnContext(ctx, "wait for LEAVE_CLEANUP_NOTIFICATION", "error", err)
+		slog.WarnContext(ctx, "wait for GO_FOR_DINNER", "error", err)
 		return err
 	}
 
 	slog.InfoContext(ctx, "received GO_FOR_DINNER", "message", msg)
 
-	cleaningRequest, err := domain.NewCleaningRequest(cottageName, "sleep")
+	cleaningRequest, err := domain.NewCleaningRequest(cottageName, domain.PrepareForSleep)
 	if err != nil {
 		return err
 	}
@@ -184,8 +218,10 @@ func (h StayHandler) PrepareCottageForSleep(ctx context.Context, cottageName str
 	return nil
 }
 
-func (h StayHandler) NotifyDinner(ctx context.Context) error {
-	dinnerCh := h.notificationService.DinnerNotification(ctx)
+func (h StayHandler) notifyDinner(ctx context.Context) error {
+	dinnerCh := make(chan interface{})
+	go h.notificationService.HourNotification(ctx, dinnerCh, 18)
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -201,8 +237,10 @@ func (h StayHandler) NotifyDinner(ctx context.Context) error {
 	}
 }
 
-func (h StayHandler) NotifyBreakfast(ctx context.Context) error {
-	breakfastCh := h.notificationService.BreakfastNotification(ctx)
+func (h StayHandler) notifyBreakfast(ctx context.Context) error {
+	breakfastCh := make(chan interface{})
+	go h.notificationService.HourNotification(ctx, breakfastCh, 6)
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -219,8 +257,10 @@ func (h StayHandler) NotifyBreakfast(ctx context.Context) error {
 	}
 }
 
-func (h StayHandler) NotifyCheckoutToday(ctx context.Context) error {
-	checkOutCh := h.notificationService.CheckOutNotification()
+func (h StayHandler) notifyCheckoutToday(ctx context.Context) error {
+	checkOutCh := make(chan []domain.Booking)
+	go h.notificationService.CheckOutNotification(ctx, checkOutCh)
+
 	select {
 	case <-ctx.Done():
 		return ctx.Err()

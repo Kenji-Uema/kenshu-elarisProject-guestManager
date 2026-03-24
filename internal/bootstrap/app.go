@@ -8,11 +8,11 @@ import (
 
 	"github.com/Kenji-Uema/guestManager/internal/app"
 	"github.com/Kenji-Uema/guestManager/internal/config"
+	"github.com/Kenji-Uema/guestManager/internal/infra/clock"
 	"github.com/Kenji-Uema/guestManager/internal/infra/mdb"
 	"github.com/Kenji-Uema/guestManager/internal/infra/mq"
 	redisinfra "github.com/Kenji-Uema/guestManager/internal/infra/redis"
 	"github.com/Kenji-Uema/guestManager/internal/infra/telemetry"
-	"github.com/Kenji-Uema/guestManager/internal/transport/grpc/clock"
 	transporthttp "github.com/Kenji-Uema/guestManager/internal/transport/http"
 	"github.com/Kenji-Uema/guestManager/internal/transport/websocket"
 	"github.com/gin-gonic/gin"
@@ -107,7 +107,7 @@ func BuildApp(ctx context.Context, cfg config.Configs) (*App, error) {
 
 	cleaningHandler := transporthttp.NewCleaningHandler(cleaningService)
 	guestHandler := transporthttp.NewGuestHandler(guestService, clockEmu)
-	wsServer := websocket.NewWebsocket(receptionService, nil, nil)
+	wsServer := websocket.NewWebsocket(receptionService, cleaningService, clockEmu, nil, nil)
 	probeHandler := transporthttp.NewProbeHandler(mongoDb, rabbitmqClient, redisClient)
 
 	router := gin.Default()

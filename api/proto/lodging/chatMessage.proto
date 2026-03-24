@@ -3,7 +3,6 @@ package lodging.v1;
 
 option go_package = "github.com/Kenji-Uema/guestManager/internal/domain/dto;dto";
 
-import "google/protobuf/timestamp.proto";
 import "lodging/guest.proto";
 import "lodging/system.proto";
 
@@ -13,16 +12,10 @@ message ChatMessage {
   string message_id = 1;
   // Correlates request/response pairs across messages.
   string correlation_id = 2;
-  // UTC time at message creation.
-  google.protobuf.Timestamp sent_at = 3;
   // Originating actor.
   Sender sender = 4;
-  // Monotonic sequence per websocket session.
-  uint64 sequence = 5;
   // Protocol contract version (for example: "lodging.v1").
   string protocol_version = 12;
-  // Current interaction phase for message validation/routing.
-  LifecyclePhase phase = 13;
 
   // Exactly one payload variant per envelope.
   oneof payload {
@@ -36,8 +29,6 @@ message ChatMessage {
     SystemRequest system_request = 9;
     // Delivery/processing acknowledgment for a prior message.
     Ack ack = 10;
-    // Structured protocol/domain error payload.
-    ErrorDetail error_detail = 11;
   }
 }
 
@@ -59,8 +50,6 @@ message Ack {
   AckStatus status = 2;
   // Machine-readable result code. Clients should branch on this value.
   ErrorCode code = 3;
-  // Human-readable context for accepted/rejected handling.
-  string reason = 4;
 }
 
 // Acknowledgment outcome.
@@ -73,48 +62,10 @@ enum AckStatus {
   ACK_STATUS_REJECTED = 2;
 }
 
-// Structured error payload for machine handling and retries.
-message ErrorDetail {
-  // Machine-readable error code. Clients should branch on this value.
-  ErrorCode code = 1;
-  // Human-readable error message.
-  string message = 2;
-  // Indicates whether the operation can be retried safely.
-  bool retryable = 3;
-  // Optional implementation-specific details for diagnostics.
-  string details = 4;
-}
-
-// High-level lifecycle phase used for websocket flow validation.
-enum LifecyclePhase {
-  // Default zero value.
-  LIFECYCLE_PHASE_UNSPECIFIED = 0;
-  // Guest is in check-in flow.
-  LIFECYCLE_PHASE_CHECK_IN = 1;
-  // Guest is checked in and currently staying.
-  LIFECYCLE_PHASE_STAY = 2;
-  // Guest is in checkout flow.
-  LIFECYCLE_PHASE_CHECK_OUT = 3;
-  // Stay is complete.
-  LIFECYCLE_PHASE_COMPLETED = 4;
-}
-
 // Stable machine-readable error codes for protocol and domain handling.
 enum ErrorCode {
   // Default zero value.
   ERROR_CODE_UNSPECIFIED = 0;
   // No error / successful processing.
   ERROR_CODE_NONE = 1;
-  // Message failed schema or required-field validation.
-  ERROR_CODE_VALIDATION_FAILED = 2;
-  // Message ordering or correlation is invalid.
-  ERROR_CODE_INVALID_STATE = 3;
-  // Requested entity was not found.
-  ERROR_CODE_NOT_FOUND = 4;
-  // Caller does not have permission for requested action.
-  ERROR_CODE_PERMISSION_DENIED = 5;
-  // Temporary system condition; safe to retry.
-  ERROR_CODE_TEMPORARY_UNAVAILABLE = 6;
-  // Unexpected internal failure.
-  ERROR_CODE_INTERNAL = 7;
 }
