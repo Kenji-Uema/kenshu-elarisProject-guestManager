@@ -33,9 +33,9 @@ type checkoutHandler interface {
 	Handle(ctx context.Context, booking domain.Booking) error
 }
 
-var newCheckinHandler = func(receptionService app.ReceptionService, cleaningService app.CleaningService,
+var newCheckinHandler = func(receptionService app.ReceptionService,
 	clock port.ClockClient, writer chat.Writer, reader chat.Reader) checkinHandler {
-	return handler.NewCheckinHandler(receptionService, cleaningService, clock, writer, reader)
+	return handler.NewCheckinHandler(receptionService, clock, writer, reader)
 }
 
 var newStayHandler = func(notificationService app.NotificationService, cleaningService app.CleaningService,
@@ -87,11 +87,16 @@ func (s *Ws) Handle(c *gin.Context) {
 		slog.WarnContext(c.Request.Context(), "upgrade websocket", "error", err)
 		return
 	}
-	defer conn.Close()
+	defer func(conn *websocket.Conn) {
+		err := conn.Close()
+		if err != nil {
+			slog.WarnContext(c.Request.Context(), "close websocket", "error", err)
+		}
+	}(conn)
 
 	reader, writer := chat.NewChat(conn, defaultReplyTimeout, defaultAckTimeout)
 
-	checkinHandler := newCheckinHandler(s.receptionService, s.cleaningService, s.clockClient, writer, reader)
+	checkinHandler := newCheckinHandler(s.receptionService, s.clockClient, writer, reader)
 	stayHandler := newStayHandler(s.notificationService, s.cleaningService, s.timeEventService, writer, reader)
 	checkoutHandler := newCheckoutHandler(s.receptionService, s.clockClient, writer, reader)
 

@@ -4,20 +4,23 @@
     "document_id": "ID-001",
     "given_names": "Alexandra Marie",
     "surname": "Lopez",
-    "email": "alexandra.lopez@example.com"
+    "email": "alexandra.lopez@example.com",
+    "billing_address": "Mountain Road 11"
   },
   {
     "_id": { "$oid": "64b6f7c2c0f1e84c0a1a9c02" },
     "document_id": "ID-002",
     "given_names": "Marcus",
     "surname": "Nguyen",
-    "email": "marcus.nguyen@example.com"
+    "email": "marcus.nguyen@example.com",
+    "billing_address": "City Avenue 21"
   },
   {
     "_id": { "$oid": "64b6f7c2c0f1e84c0a1a9c03" },
     "document_id": "ID-003",
     "given_names": "Priya",
     "surname": "Patel",
-    "email": "priya.patel@example.com"
+    "email": "priya.patel@example.com",
+    "billing_address": "Garden Lane 7"
   }
 ]

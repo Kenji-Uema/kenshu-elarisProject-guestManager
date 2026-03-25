@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Kenji-Uema/guestManager/internal/app/validation"
 	"github.com/Kenji-Uema/guestManager/internal/domain"
 	"github.com/Kenji-Uema/guestManager/internal/domain/errors/validationErrors"
 	"github.com/Kenji-Uema/guestManager/internal/port"
@@ -26,8 +27,15 @@ type guestService struct {
 	bookingRepo port.BookingRepo
 }
 
-func NewGuestService(guestRepo port.GuestRepo, bookingRepo port.BookingRepo) GuestService {
-	return &guestService{guestRepo: guestRepo, bookingRepo: bookingRepo}
+func NewGuestService(guestRepo port.GuestRepo, bookingRepo port.BookingRepo) (GuestService, error) {
+	if err := validation.New().
+		NotZeroValue("guestRepo", guestRepo).
+		NotZeroValue("bookingRepo", bookingRepo).
+		Validate(); err != nil {
+		return nil, fmt.Errorf("NewGuestService: %w", err)
+	}
+
+	return &guestService{guestRepo: guestRepo, bookingRepo: bookingRepo}, nil
 }
 
 func (s *guestService) GetById(ctx context.Context, id bson.ObjectID) (domain.Guest, error) {
@@ -37,7 +45,7 @@ func (s *guestService) GetById(ctx context.Context, id bson.ObjectID) (domain.Gu
 	}
 
 	guest, err := domain.NewGuest(guestDoc.Id, guestDoc.DocumentId, guestDoc.GivenNames, guestDoc.Surname,
-		guestDoc.Email, guestDoc.CreatedAt, guestDoc.LastUpdate)
+		guestDoc.Email, guestDoc.BillingAddress, guestDoc.CreatedAt, guestDoc.LastUpdate)
 	if err != nil {
 		var validationErr *validationErrors.ErrValidationConstrain
 		if errors.As(err, &validationErr) {
@@ -57,7 +65,7 @@ func (s *guestService) GetByDocument(ctx context.Context, documentId string) (do
 	}
 
 	guest, err := domain.NewGuest(guestDoc.Id, guestDoc.DocumentId, guestDoc.GivenNames, guestDoc.Surname,
-		guestDoc.Email, guestDoc.CreatedAt, guestDoc.LastUpdate)
+		guestDoc.Email, guestDoc.BillingAddress, guestDoc.CreatedAt, guestDoc.LastUpdate)
 	if err != nil {
 		var validationErr *validationErrors.ErrValidationConstrain
 		if errors.As(err, &validationErr) {
@@ -82,7 +90,7 @@ func (s *guestService) Update(ctx context.Context, id bson.ObjectID, guest domai
 	}
 
 	updatedGuest, err := domain.NewGuest(updatedGuestDoc.Id, updatedGuestDoc.DocumentId, updatedGuestDoc.GivenNames,
-		updatedGuestDoc.Surname, updatedGuestDoc.Email, updatedGuestDoc.CreatedAt, updatedGuestDoc.LastUpdate)
+		updatedGuestDoc.Surname, updatedGuestDoc.Email, updatedGuestDoc.BillingAddress, updatedGuestDoc.CreatedAt, updatedGuestDoc.LastUpdate)
 	if err != nil {
 		var validationErr *validationErrors.ErrValidationConstrain
 		if errors.As(err, &validationErr) {
@@ -107,7 +115,7 @@ func (s *guestService) GetBookings(ctx context.Context, guestId bson.ObjectID) (
 
 	bookings := make([]domain.Booking, len(bookingsDoc))
 	for _, b := range bookingsDoc {
-		stayPeriod, err := domain.NewPeriod(b.StayPeriod.Start, b.StayPeriod.End)
+		stayPeriod, err := domain.NewPeriod(b.StayPeriod.CheckIn, b.StayPeriod.CheckOut)
 		if err != nil {
 			return nil, err
 		}
@@ -149,7 +157,7 @@ func (s *guestService) GetBookingByDate(ctx context.Context, document string, da
 	bookingIdx := -1
 
 	for i := range allBookings {
-		if startOfDay(allBookings[i].StayPeriod.Start).Equal(todayStart) {
+		if startOfDay(allBookings[i].StayPeriod.CheckIn).Equal(todayStart) {
 			bookingIdx = i
 			break
 		}
@@ -161,7 +169,7 @@ func (s *guestService) GetBookingByDate(ctx context.Context, document string, da
 
 	selectedBooking := allBookings[bookingIdx]
 
-	stayPeriod, err := domain.NewPeriod(selectedBooking.StayPeriod.Start, selectedBooking.StayPeriod.End)
+	stayPeriod, err := domain.NewPeriod(selectedBooking.StayPeriod.CheckIn, selectedBooking.StayPeriod.CheckOut)
 	if err != nil {
 		return domain.Booking{}, fmt.Errorf("map booking stay period for guest %s: %w", document, err)
 	}

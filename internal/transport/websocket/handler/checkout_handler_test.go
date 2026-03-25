@@ -9,7 +9,7 @@ import (
 	appfakes "github.com/Kenji-Uema/guestManager/internal/app/fakes"
 	"github.com/Kenji-Uema/guestManager/internal/domain"
 	"github.com/Kenji-Uema/guestManager/internal/domain/dto"
-	infrafakes "github.com/Kenji-Uema/guestManager/internal/infra/fakes"
+	infrafakes "github.com/Kenji-Uema/guestManager/internal/infra/clock/fakes"
 	chatfakes "github.com/Kenji-Uema/guestManager/internal/transport/websocket/chat/fakes"
 )
 
@@ -26,18 +26,17 @@ func TestCheckoutHandlerHandle(t *testing.T) {
 		now := time.Date(2026, 3, 24, 11, 0, 0, 0, time.UTC)
 		booking := mustBooking(t, "cottage-9")
 		notifications := make([]dto.SystemNotification, 0, 1)
+		waitedActions := make([]dto.GuestAction, 0, 2)
 
 		fakeClock.NowFn = func(ctx context.Context) (*time.Time, error) {
 			return &now, nil
 		}
 		fakeReader.WaitForGuestActionFn = func(ctx context.Context, action dto.GuestAction) (*dto.ChatMessage, error) {
-			if action != dto.GuestAction_PROCEED_TO_CHECKOUT {
-				t.Fatalf("Handle() unexpected guest action: %v", action)
-			}
+			waitedActions = append(waitedActions, action)
 			return &dto.ChatMessage{
 				MessageId: "guest-checkout",
 				Payload: &dto.ChatMessage_GuestAction{
-					GuestAction: dto.GuestAction_PROCEED_TO_CHECKOUT,
+					GuestAction: action,
 				},
 			}, nil
 		}
@@ -80,14 +79,23 @@ func TestCheckoutHandlerHandle(t *testing.T) {
 		if fakeClock.NowCallCount != 1 {
 			t.Fatalf("Handle() expected 1 clock call, got %d", fakeClock.NowCallCount)
 		}
-		if fakeReader.WaitForGuestActionCallCount != 1 {
-			t.Fatalf("Handle() expected 1 guest action wait, got %d", fakeReader.WaitForGuestActionCallCount)
+		if fakeReader.WaitForGuestActionCallCount != 2 {
+			t.Fatalf("Handle() expected 2 guest action waits, got %d", fakeReader.WaitForGuestActionCallCount)
+		}
+		if len(waitedActions) != 2 || waitedActions[0] != dto.GuestAction_PROCEED_TO_CHECKOUT || waitedActions[1] != dto.GuestAction_RETURN_COTTAGE_KEY {
+			t.Fatalf("Handle() unexpected guest actions: %+v", waitedActions)
 		}
 		if fakeWriter.SendSystemRequestCallCount != 1 {
 			t.Fatalf("Handle() expected 1 system request, got %d", fakeWriter.SendSystemRequestCallCount)
 		}
 		if fakeReception.CheckOutCallCount != 1 {
 			t.Fatalf("Handle() expected 1 checkout call, got %d", fakeReception.CheckOutCallCount)
+		}
+		if fakeReception.ReturnCottageKeyCallCount != 1 {
+			t.Fatalf("Handle() expected 1 return cottage key call, got %d", fakeReception.ReturnCottageKeyCallCount)
+		}
+		if fakeReception.LastReturnCottageName != booking.CottageName || fakeReception.LastReturnKeyNumber != "key-9" {
+			t.Fatalf("Handle() unexpected return cottage key args: room=%q key=%q", fakeReception.LastReturnCottageName, fakeReception.LastReturnKeyNumber)
 		}
 		if len(notifications) != 1 || notifications[0] != dto.SystemNotification_CHECK_OUT_COMPLETE {
 			t.Fatalf("Handle() unexpected notifications: %+v", notifications)

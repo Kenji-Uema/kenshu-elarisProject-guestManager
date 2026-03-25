@@ -2,85 +2,131 @@ package app
 
 import (
 	"context"
-	"reflect"
+	"errors"
 	"testing"
 
 	"github.com/Kenji-Uema/guestManager/internal/domain"
-	"github.com/Kenji-Uema/guestManager/internal/port"
+	"github.com/Kenji-Uema/guestManager/internal/domain/dto"
+	"github.com/Kenji-Uema/guestManager/internal/domain/enum"
+	mqfakes "github.com/Kenji-Uema/guestManager/internal/infra/mq/fakes"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestNewCleaningService(t *testing.T) {
-	type args struct {
-		publisher port.MqPublisher
-	}
-	tests := []struct {
-		name string
-		args args
-		want CleaningService
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := NewCleaningService(tt.args.publisher); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("NewCleaningService() = %v, want %v", got, tt.want)
-			}
-		})
-	}
+	t.Run("returns error when publisher is nil", func(t *testing.T) {
+		var publisher *mqfakes.FakeMqProducer
+
+		service, err := NewCleaningService(publisher)
+		if err == nil {
+			t.Fatal("NewCleaningService() error = nil, want non-nil")
+		}
+		if service != nil {
+			t.Fatalf("NewCleaningService() service = %v, want nil", service)
+		}
+	})
+
+	t.Run("returns service when publisher is valid", func(t *testing.T) {
+		publisher := &mqfakes.FakeMqProducer{}
+
+		service, err := NewCleaningService(publisher)
+		if err != nil {
+			t.Fatalf("NewCleaningService() error = %v", err)
+		}
+		if service == nil {
+			t.Fatal("NewCleaningService() service = nil, want non-nil")
+		}
+	})
 }
 
-func Test_cleaningService_CleanRoom(t *testing.T) {
-	type fields struct {
-		publisher port.MqPublisher
-	}
-	type args struct {
-		ctx context.Context
-		r   domain.CleaningRequest
-	}
+func TestCleaningServiceCleanRoom(t *testing.T) {
 	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		wantErr bool
+		name        string
+		requestType enum.CleaningRequestType
+		wantType    dto.RequestType
 	}{
-		// TODO: Add test cases.
+		{
+			name:        "publishes prepare for guest request",
+			requestType: enum.PrepareForGuest,
+			wantType:    dto.RequestType_PREPARE_FOR_GUEST,
+		},
+		{
+			name:        "publishes daily cleaning request",
+			requestType: enum.DailyCleaning,
+			wantType:    dto.RequestType_DAILY_CLEANING,
+		},
+		{
+			name:        "publishes full cleaning request",
+			requestType: enum.FullCleaning,
+			wantType:    dto.RequestType_FULL_CLEANING,
+		},
+		{
+			name:        "publishes prepare for sleep request",
+			requestType: enum.PrepareForSleep,
+			wantType:    dto.RequestType_PREPARE_FOR_SLEEP,
+		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			c := cleaningService{
-				publisher: tt.fields.publisher,
-			}
-			if err := c.CleanRoom(tt.args.ctx, tt.args.r); (err != nil) != tt.wantErr {
-				t.Errorf("CleanRoom() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
 
-func Test_cleaningService_MakeupRoom(t *testing.T) {
-	type fields struct {
-		publisher port.MqPublisher
-	}
-	type args struct {
-		ctx context.Context
-		r   domain.CleaningRequest
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := cleaningService{
-				publisher: tt.fields.publisher,
+			publisher := &mqfakes.FakeMqProducer{}
+			service, err := NewCleaningService(publisher)
+			if err != nil {
+				t.Fatalf("NewCleaningService() error = %v", err)
 			}
-			if err := c.MakeupRoom(tt.args.ctx, tt.args.r); (err != nil) != tt.wantErr {
-				t.Errorf("MakeupRoom() error = %v, wantErr %v", err, tt.wantErr)
+
+			req, err := domain.NewCleaningOrder("Cottage 1", tt.requestType)
+			if err != nil {
+				t.Fatalf("NewCleaningOrder() error = %v", err)
+			}
+
+			ctx := context.Background()
+			if err := service.CleanRoom(ctx, req); err != nil {
+				t.Fatalf("CleanRoom() error = %v", err)
+			}
+
+			if publisher.PublishCallCount != 1 {
+				t.Fatalf("Publish() call count = %d, want 1", publisher.PublishCallCount)
+			}
+			if publisher.LastPublishedCtx != ctx {
+				t.Fatal("Publish() ctx did not match input ctx")
+			}
+			if publisher.LastPublishedRoutingKey != "" {
+				t.Fatalf("Publish() routing key = %q, want empty string", publisher.LastPublishedRoutingKey)
+			}
+
+			message, ok := publisher.LastPublishedMessage.(*dto.CleaningRequest)
+			if !ok {
+				t.Fatalf("Publish() message type = %T, want *dto.CleaningOrder", publisher.LastPublishedMessage)
+			}
+			if message.RoomName != "Cottage 1" {
+				t.Fatalf("Publish() room name = %q, want %q", message.RoomName, "Cottage 1")
+			}
+			if message.Request != tt.wantType {
+				t.Fatalf("Publish() request type = %v, want %v", message.Request, tt.wantType)
 			}
 		})
 	}
+
+	t.Run("returns publish error", func(t *testing.T) {
+		publishErr := errors.New("publish failed")
+		publisher := &mqfakes.FakeMqProducer{
+			PublishFn: func(ctx context.Context, message proto.Message, routingKey string) error {
+				return publishErr
+			},
+		}
+		service, err := NewCleaningService(publisher)
+		if err != nil {
+			t.Fatalf("NewCleaningService() error = %v", err)
+		}
+
+		req, err := domain.NewCleaningOrder("Cottage 2", enum.DailyCleaning)
+		if err != nil {
+			t.Fatalf("NewCleaningOrder() error = %v", err)
+		}
+
+		err = service.CleanRoom(context.Background(), req)
+		if !errors.Is(err, publishErr) {
+			t.Fatalf("CleanRoom() error = %v, want %v", err, publishErr)
+		}
+	})
 }

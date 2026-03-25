@@ -35,7 +35,14 @@ func (h CheckoutHandler) Handle(ctx context.Context, booking domain.Booking) err
 		return err
 	}
 
-	if _, err := h.requestCottageKey(ctx); err != nil {
+	keyNumber, err := h.requestCottageKey(ctx)
+	if err != nil {
+		return err
+	}
+	if _, err := h.reader.WaitForGuestAction(ctx, dto.GuestAction_RETURN_COTTAGE_KEY); err != nil {
+		return err
+	}
+	if err := h.receptionService.ReturnCottageKey(ctx, booking.CottageName, keyNumber); err != nil {
 		return err
 	}
 

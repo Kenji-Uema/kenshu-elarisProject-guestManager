@@ -60,7 +60,7 @@ func Test_guestRepo_GetById_ReturnsGuest(t *testing.T) {
 			t.Fatalf("GetById() unexpected error: %v", err)
 		}
 
-		if got.DocumentId != "ID-001" || got.GivenNames != "Alexandra Marie" || got.Surname != "Lopez" {
+		if got.DocumentId != "ID-001" || got.GivenNames != "Alexandra Marie" || got.Surname != "Lopez" || got.BillingAddress != "Mountain Road 11" {
 			t.Fatalf("GetById() returned unexpected guest: %+v", got)
 		}
 	})
@@ -92,7 +92,7 @@ func Test_guestRepo_GetByDocument_ReturnsGuest(t *testing.T) {
 			t.Fatalf("GetByDocument() unexpected error: %v", err)
 		}
 
-		if got.GivenNames != "Marcus" || got.Surname != "Nguyen" {
+		if got.GivenNames != "Marcus" || got.Surname != "Nguyen" || got.BillingAddress != "City Avenue 21" {
 			t.Fatalf("GetByDocument() returned unexpected guest: %+v", got)
 		}
 	})
@@ -120,10 +120,11 @@ func Test_guestRepo_Add_InsertsGuest(t *testing.T) {
 
 		r := &guestRepo{collection: gr}
 		newGuest := documents.Guest{
-			DocumentId: "ID-999",
-			GivenNames: "Test",
-			Surname:    "User",
-			Email:      "test.user@example.com",
+			DocumentId:     "ID-999",
+			GivenNames:     "Test",
+			Surname:        "User",
+			Email:          "test.user@example.com",
+			BillingAddress: "Harbor Street 9",
 		}
 
 		insertedID, err := r.Add(ctx, newGuest)
@@ -139,7 +140,7 @@ func Test_guestRepo_Add_InsertsGuest(t *testing.T) {
 			t.Fatalf("GetById() after add unexpected error: %v", err)
 		}
 
-		if inserted.DocumentId != newGuest.DocumentId || inserted.Email != newGuest.Email {
+		if inserted.DocumentId != newGuest.DocumentId || inserted.Email != newGuest.Email || inserted.BillingAddress != newGuest.BillingAddress {
 			t.Fatalf("Add() stored unexpected guest: %+v", inserted)
 		}
 	})
@@ -172,10 +173,11 @@ func Test_guestRepo_Update_UpdatesFields(t *testing.T) {
 
 		r := &guestRepo{collection: gr}
 		updatedGuest := documents.Guest{
-			DocumentId: "ID-002-UPDATED",
-			GivenNames: "Marcus Aurelius",
-			Surname:    "Nguyen",
-			Email:      "marcus.aurelius@example.com",
+			DocumentId:     "ID-002-UPDATED",
+			GivenNames:     "Marcus Aurelius",
+			Surname:        "Nguyen",
+			Email:          "marcus.aurelius@example.com",
+			BillingAddress: "City Avenue 21",
 		}
 
 		got, err := r.Update(ctx, id, updatedGuest)
@@ -183,7 +185,7 @@ func Test_guestRepo_Update_UpdatesFields(t *testing.T) {
 			t.Fatalf("Update() unexpected error: %v", err)
 		}
 
-		if got.DocumentId != updatedGuest.DocumentId || got.Email != updatedGuest.Email || got.GivenNames != updatedGuest.GivenNames {
+		if got.DocumentId != updatedGuest.DocumentId || got.Email != updatedGuest.Email || got.GivenNames != updatedGuest.GivenNames || got.BillingAddress != updatedGuest.BillingAddress {
 			t.Fatalf("Update() returned unexpected guest: %+v", got)
 		}
 
@@ -191,7 +193,7 @@ func Test_guestRepo_Update_UpdatesFields(t *testing.T) {
 		if err != nil {
 			t.Fatalf("GetById() after update unexpected error: %v", err)
 		}
-		if reloaded.DocumentId != updatedGuest.DocumentId || reloaded.Email != updatedGuest.Email {
+		if reloaded.DocumentId != updatedGuest.DocumentId || reloaded.Email != updatedGuest.Email || reloaded.BillingAddress != updatedGuest.BillingAddress {
 			t.Fatalf("Update() did not persist changes: %+v", reloaded)
 		}
 	})
@@ -204,10 +206,11 @@ func Test_guestRepo_Update_NotFound(t *testing.T) {
 
 		r := &guestRepo{collection: gr}
 		updatedGuest := documents.Guest{
-			DocumentId: "ID-404",
-			GivenNames: "Ghost",
-			Surname:    "Person",
-			Email:      "ghost.person@example.com",
+			DocumentId:     "ID-404",
+			GivenNames:     "Ghost",
+			Surname:        "Person",
+			Email:          "ghost.person@example.com",
+			BillingAddress: "Nowhere 0",
 		}
 
 		_, err := r.Update(ctx, bson.NewObjectID(), updatedGuest)
@@ -231,10 +234,11 @@ func Test_guestRepo_Update_NoChanges(t *testing.T) {
 
 		r := &guestRepo{collection: gr}
 		noChanges := documents.Guest{
-			DocumentId: "ID-003",
-			GivenNames: "Priya",
-			Surname:    "Patel",
-			Email:      "priya.patel@example.com",
+			DocumentId:     "ID-003",
+			GivenNames:     "Priya",
+			Surname:        "Patel",
+			Email:          "priya.patel@example.com",
+			BillingAddress: "Garden Lane 7",
 		}
 
 		got, err := r.Update(ctx, id, noChanges)
@@ -242,7 +246,7 @@ func Test_guestRepo_Update_NoChanges(t *testing.T) {
 			t.Fatalf("Update() unexpected error: %v", err)
 		}
 
-		if got.DocumentId != noChanges.DocumentId || got.Email != noChanges.Email {
+		if got.DocumentId != noChanges.DocumentId || got.Email != noChanges.Email || got.BillingAddress != noChanges.BillingAddress {
 			t.Fatalf("Update() returned unexpected guest: %+v", got)
 		}
 	})

@@ -53,6 +53,13 @@ func NewTimeEventService(hourChangeClient port.MqConsumer, dayChangeClient port.
 	}, nil
 }
 
+func NewInMemoryTimeEventService() TimeEventService {
+	return &timeEventService{
+		hourChangeChannels: domain.NewSet[chan<- time.Time](),
+		dayChangeChannels:  domain.NewSet[chan<- time.Time](),
+	}
+}
+
 func (s *timeEventService) Start(ctx context.Context) {
 	hourChangeDeliveries, err := s.hourChangeClient.Consume(ctx)
 	if err != nil {
@@ -76,7 +83,7 @@ func (s *timeEventService) Start(ctx context.Context) {
 				return
 			}
 
-			currentTime, err := unmarshalTimeEvent(ctx, hourChange.Body)
+			currentTime, err := s.unmarshalTimeEvent(ctx, hourChange.Body)
 			if err != nil {
 				slog.ErrorContext(ctx, "failed to unmarshal hour change event", "error", err)
 				s.nackDelivery(ctx, hourChange, "hourChangeEvent")
@@ -91,7 +98,7 @@ func (s *timeEventService) Start(ctx context.Context) {
 				return
 			}
 
-			currentTime, err := unmarshalTimeEvent(ctx, dayChange.Body)
+			currentTime, err := s.unmarshalTimeEvent(ctx, dayChange.Body)
 			if err != nil {
 				slog.ErrorContext(ctx, "failed to unmarshal day change event", "error", err)
 				s.nackDelivery(ctx, dayChange, "dayChangeEvent")
@@ -203,7 +210,7 @@ func (s *timeEventService) nackDelivery(ctx context.Context, delivery amqp.Deliv
 	}
 }
 
-func unmarshalTimeEvent(ctx context.Context, body []byte) (time.Time, error) {
+func (s *timeEventService) unmarshalTimeEvent(ctx context.Context, body []byte) (time.Time, error) {
 	var timeEvent dto.TimeEvent
 	if err := proto.Unmarshal(body, &timeEvent); err != nil {
 		slog.WarnContext(ctx, "invalid day.changed payload", "error", err)

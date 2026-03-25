@@ -10,6 +10,6 @@ type BookingDto struct {
 }
 
 type Period struct {
-	Start time.Time `json:"start"`
-	End   time.Time `json:"end"`
+	CheckIn  time.Time `json:"checkin"`
+	CheckOut time.Time `json:"checkout"`
 }

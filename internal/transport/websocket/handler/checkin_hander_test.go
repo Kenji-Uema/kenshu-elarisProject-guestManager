@@ -9,7 +9,7 @@ import (
 	appfakes "github.com/Kenji-Uema/guestManager/internal/app/fakes"
 	"github.com/Kenji-Uema/guestManager/internal/domain"
 	"github.com/Kenji-Uema/guestManager/internal/domain/dto"
-	infrafakes "github.com/Kenji-Uema/guestManager/internal/infra/fakes"
+	infrafakes "github.com/Kenji-Uema/guestManager/internal/infra/clock/fakes"
 	chatfakes "github.com/Kenji-Uema/guestManager/internal/transport/websocket/chat/fakes"
 )
 
@@ -18,7 +18,7 @@ func TestCheckinHandlerHandle(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		fakeReception, fakeCleaning, fakeClock, fakeReader, fakeWriter := fakesDependencies(t)
-		handler := NewCheckinHandler(fakeReception, fakeCleaning, fakeClock, fakeWriter, fakeReader)
+		handler := NewCheckinHandler(fakeReception, fakeClock, fakeWriter, fakeReader)
 
 		now := time.Date(2026, 3, 22, 12, 0, 0, 0, time.UTC)
 		booking := mustBooking(t, "cottage-7")
@@ -28,14 +28,13 @@ func TestCheckinHandlerHandle(t *testing.T) {
 		fakeClock.NowFn = func(ctx context.Context) (*time.Time, error) {
 			return &now, nil
 		}
+		waitedActions := make([]dto.GuestAction, 0, 2)
 		fakeReader.WaitForGuestActionFn = func(ctx context.Context, action dto.GuestAction) (*dto.ChatMessage, error) {
-			if action != dto.GuestAction_SHOW_FOR_CHECKIN {
-				t.Fatalf("Handle() unexpected guest action: %v", action)
-			}
+			waitedActions = append(waitedActions, action)
 			return &dto.ChatMessage{
 				MessageId: "guest-checkin",
 				Payload: &dto.ChatMessage_GuestAction{
-					GuestAction: dto.GuestAction_SHOW_FOR_CHECKIN,
+					GuestAction: action,
 				},
 			}, nil
 		}
@@ -98,17 +97,23 @@ func TestCheckinHandlerHandle(t *testing.T) {
 		if fakeClock.NowCallCount != 1 {
 			t.Fatalf("Handle() expected 1 clock call, got %d", fakeClock.NowCallCount)
 		}
+		if len(waitedActions) != 2 || waitedActions[0] != dto.GuestAction_SHOW_FOR_CHECKIN || waitedActions[1] != dto.GuestAction_TAKE_COTTAGE_KEY {
+			t.Fatalf("Handle() unexpected guest actions: %+v", waitedActions)
+		}
 		if fakeReception.CheckInCallCount != 1 {
 			t.Fatalf("Handle() expected 1 checkin call, got %d", fakeReception.CheckInCallCount)
+		}
+		if fakeReception.ReceiveCottageKeyCallCount != 1 {
+			t.Fatalf("Handle() expected 1 receive cottage key call, got %d", fakeReception.ReceiveCottageKeyCallCount)
+		}
+		if fakeReception.LastReceiveCottageName != booking.CottageName || fakeReception.LastReceiveKeyNumber != "key-7" {
+			t.Fatalf("Handle() unexpected receive cottage key args: room=%q key=%q", fakeReception.LastReceiveCottageName, fakeReception.LastReceiveKeyNumber)
 		}
 		if fakeReception.CheckinFallbackCallCount != 0 {
 			t.Fatalf("Handle() expected no fallback calls, got %d", fakeReception.CheckinFallbackCallCount)
 		}
-		if fakeCleaning.CleanRoomCallCount != 1 {
-			t.Fatalf("Handle() expected 1 cleaning call, got %d", fakeCleaning.CleanRoomCallCount)
-		}
-		if fakeCleaning.LastCleaningRequest.RoomName != "cottage-7" || fakeCleaning.LastCleaningRequest.RequestType != domain.PrepareForGuest {
-			t.Fatalf("Handle() unexpected cleaning request: %+v", fakeCleaning.LastCleaningRequest)
+		if fakeCleaning.CleanRoomCallCount != 0 {
+			t.Fatalf("Handle() expected no cleaning calls, got %d", fakeCleaning.CleanRoomCallCount)
 		}
 		if len(requests) != 2 || requests[0] != dto.SystemRequest_REQUEST_DOCUMENT || requests[1] != dto.SystemRequest_GIVE_COTTAGE_KEY {
 			t.Fatalf("Handle() unexpected system requests: %+v", requests)
@@ -120,7 +125,7 @@ func TestCheckinHandlerHandle(t *testing.T) {
 
 	t.Run("fallback success", func(t *testing.T) {
 		fakeReception, fakeCleaning, fakeClock, fakeReader, fakeWriter := fakesDependencies(t)
-		handler := NewCheckinHandler(fakeReception, fakeCleaning, fakeClock, fakeWriter, fakeReader)
+		handler := NewCheckinHandler(fakeReception, fakeClock, fakeWriter, fakeReader)
 		now := time.Date(2026, 3, 22, 12, 0, 0, 0, time.UTC)
 		booking := mustBooking(t, "cottage-8")
 		requests := make([]dto.SystemRequest, 0, 3)
@@ -128,11 +133,13 @@ func TestCheckinHandlerHandle(t *testing.T) {
 		fakeClock.NowFn = func(ctx context.Context) (*time.Time, error) {
 			return &now, nil
 		}
+		waitedActions := make([]dto.GuestAction, 0, 2)
 		fakeReader.WaitForGuestActionFn = func(ctx context.Context, action dto.GuestAction) (*dto.ChatMessage, error) {
+			waitedActions = append(waitedActions, action)
 			return &dto.ChatMessage{
 				MessageId: "guest-checkin",
 				Payload: &dto.ChatMessage_GuestAction{
-					GuestAction: dto.GuestAction_SHOW_FOR_CHECKIN,
+					GuestAction: action,
 				},
 			}, nil
 		}
@@ -192,11 +199,20 @@ func TestCheckinHandlerHandle(t *testing.T) {
 		if got.CottageName != booking.CottageName {
 			t.Fatalf("Handle() unexpected booking: %+v", got)
 		}
+		if len(waitedActions) != 2 || waitedActions[0] != dto.GuestAction_SHOW_FOR_CHECKIN || waitedActions[1] != dto.GuestAction_TAKE_COTTAGE_KEY {
+			t.Fatalf("Handle() unexpected guest actions: %+v", waitedActions)
+		}
 		if fakeReception.CheckInCallCount != 1 || fakeReception.CheckinFallbackCallCount != 1 {
 			t.Fatalf("Handle() unexpected reception calls: checkin=%d fallback=%d", fakeReception.CheckInCallCount, fakeReception.CheckinFallbackCallCount)
 		}
-		if fakeCleaning.CleanRoomCallCount != 1 {
-			t.Fatalf("Handle() expected 1 cleaning call, got %d", fakeCleaning.CleanRoomCallCount)
+		if fakeReception.ReceiveCottageKeyCallCount != 1 {
+			t.Fatalf("Handle() expected 1 receive cottage key call, got %d", fakeReception.ReceiveCottageKeyCallCount)
+		}
+		if fakeReception.LastReceiveCottageName != booking.CottageName || fakeReception.LastReceiveKeyNumber != "key-8" {
+			t.Fatalf("Handle() unexpected receive cottage key args: room=%q key=%q", fakeReception.LastReceiveCottageName, fakeReception.LastReceiveKeyNumber)
+		}
+		if fakeCleaning.CleanRoomCallCount != 0 {
+			t.Fatalf("Handle() expected no cleaning calls, got %d", fakeCleaning.CleanRoomCallCount)
 		}
 		if len(requests) != 3 || requests[0] != dto.SystemRequest_REQUEST_DOCUMENT || requests[1] != dto.SystemRequest_REQUEST_BOOKING_NUMBER || requests[2] != dto.SystemRequest_GIVE_COTTAGE_KEY {
 			t.Fatalf("Handle() unexpected system requests: %+v", requests)
@@ -205,17 +221,19 @@ func TestCheckinHandlerHandle(t *testing.T) {
 
 	t.Run("returns error on malformed document response", func(t *testing.T) {
 		fakeReception, fakeCleaning, fakeClock, fakeReader, fakeWriter := fakesDependencies(t)
-		handler := NewCheckinHandler(fakeReception, fakeCleaning, fakeClock, fakeWriter, fakeReader)
+		handler := NewCheckinHandler(fakeReception, fakeClock, fakeWriter, fakeReader)
 		now := time.Date(2026, 3, 22, 12, 0, 0, 0, time.UTC)
 
 		fakeClock.NowFn = func(ctx context.Context) (*time.Time, error) {
 			return &now, nil
 		}
+		waitedActions := make([]dto.GuestAction, 0, 1)
 		fakeReader.WaitForGuestActionFn = func(ctx context.Context, action dto.GuestAction) (*dto.ChatMessage, error) {
+			waitedActions = append(waitedActions, action)
 			return &dto.ChatMessage{
 				MessageId: "guest-checkin",
 				Payload: &dto.ChatMessage_GuestAction{
-					GuestAction: dto.GuestAction_SHOW_FOR_CHECKIN,
+					GuestAction: action,
 				},
 			}, nil
 		}
@@ -231,8 +249,14 @@ func TestCheckinHandlerHandle(t *testing.T) {
 		if !errors.Is(err, ErrUnexpectedResponse) {
 			t.Fatalf("Handle() expected ErrUnexpectedResponse, got %v", err)
 		}
+		if len(waitedActions) != 1 || waitedActions[0] != dto.GuestAction_SHOW_FOR_CHECKIN {
+			t.Fatalf("Handle() unexpected guest actions: %+v", waitedActions)
+		}
 		if fakeReception.CheckInCallCount != 0 || fakeReception.CheckinFallbackCallCount != 0 {
 			t.Fatalf("Handle() unexpected reception calls: checkin=%d fallback=%d", fakeReception.CheckInCallCount, fakeReception.CheckinFallbackCallCount)
+		}
+		if fakeReception.ReceiveCottageKeyCallCount != 0 {
+			t.Fatalf("Handle() expected no receive cottage key calls, got %d", fakeReception.ReceiveCottageKeyCallCount)
 		}
 		if fakeCleaning.CleanRoomCallCount != 0 {
 			t.Fatalf("Handle() expected no cleaning calls, got %d", fakeCleaning.CleanRoomCallCount)

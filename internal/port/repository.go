@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/Kenji-Uema/guestManager/internal/domain/documents"
+	"github.com/Kenji-Uema/guestManager/internal/domain/enum"
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
@@ -18,6 +19,7 @@ type GuestRepo interface {
 type CottageRepo interface {
 	GetByName(ctx context.Context, roomName string) (documents.Cottage, error)
 	UpdateCurrentGuest(ctx context.Context, roomName string, guestId bson.ObjectID) error
+	UpdateKeyHolder(ctx context.Context, roomName string, keyNumber string, holder enum.KeyHolder) error
 	RemovePastBooking(ctx context.Context, bookingId bson.ObjectID) error
 }
 
@@ -26,4 +28,5 @@ type BookingRepo interface {
 	FindByCheckInDate(ctx context.Context, date time.Time) ([]documents.Booking, error)
 	FindByGuestIdAndCheckIn(ctx context.Context, guestId bson.ObjectID, checkIn time.Time) (documents.Booking, error)
 	FindByGuestIdAndBookingNumber(ctx context.Context, guestId bson.ObjectID, bookingNumber string) (documents.Booking, error)
+	UpdateStatus(ctx context.Context, bookingId bson.ObjectID, status enum.BookingStatus) error
 }

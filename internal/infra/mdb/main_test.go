@@ -2,20 +2,19 @@ package mdb
 
 import (
 	"context"
-	"fmt"
 	"log"
-	"net/url"
 	"os"
 	"testing"
 	"time"
 
-	"github.com/Kenji-Uema/guestManager/internal/config"
 	"github.com/Kenji-Uema/guestManager/internal/domain/documents"
 
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/mongodb"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/mongo/readpref"
 )
 
 var (
@@ -26,7 +25,7 @@ var (
 )
 
 func TestMain(m *testing.M) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	var err error
@@ -45,23 +44,22 @@ func TestMain(m *testing.M) {
 		log.Fatalf("failed to get connection string: %v", err)
 	}
 
-	parsedURI, err := url.Parse(uri)
-	if err != nil {
-		log.Fatalf("failed to parse connection string: %v", err)
-	}
-	mongoHost := parsedURI.Host
-	if parsedURI.RawQuery != "" {
-		mongoHost = fmt.Sprintf("%s/?%s", parsedURI.Host, parsedURI.RawQuery)
-	}
-
-	db, err := NewMongoDb(context.Background(), config.MongoConfig{
-		Username: "test_user",
-		Password: "test_pass",
-		Host:     mongoHost,
-		Database: "test_db",
-	})
+	clientOptions := options.Client().ApplyURI(uri).SetConnectTimeout(10 * time.Second)
+	client, err := mongo.Connect(clientOptions)
 	if err != nil {
 		log.Fatalf("failed to connect mongo client: %v", err)
+	}
+
+	pingCtx, pingCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer pingCancel()
+	if err := client.Ping(pingCtx, readpref.Primary()); err != nil {
+		_ = client.Disconnect(context.Background())
+		log.Fatalf("failed to connect mongo client: %v", err)
+	}
+
+	db := &Mdb{
+		client:   client,
+		Database: client.Database("test_db"),
 	}
 
 	bookingRepository = &bookingRepo{collection: db.Database.Collection("Booking")}
@@ -70,9 +68,7 @@ func TestMain(m *testing.M) {
 
 	code := m.Run()
 
-	if db != nil {
-		_ = db.Close(context.Background())
-	}
+	_ = db.Close(context.Background())
 	_ = testcontainers.TerminateContainer(mongoC)
 
 	os.Exit(code)
@@ -83,9 +79,9 @@ func setupAndRun(testName string, t *testing.T, test func(t *testing.T, ct *mong
 	bookingCollection := bookingRepository.collection
 	guestCollection := guestRepository.collection
 
-	seed[documents.Cottage](t, cottageCollection, "../../../test/test_data/cottages_fixture.json")
-	seed[documents.Booking](t, bookingCollection, "../../../test/test_data/bookings_fixture.json")
-	seed[documents.Guest](t, guestCollection, "../../../test/test_data/guests_fixture.json")
+	seed[documents.Cottage](t, cottageCollection, "../../../test_data/cottages_fixture.json")
+	seed[documents.Booking](t, bookingCollection, "../../../test_data/bookings_fixture.json")
+	seed[documents.Guest](t, guestCollection, "../../../test_data/guests_fixture.json")
 
 	t.Cleanup(func() {
 		_ = cottageCollection.Drop(context.Background())

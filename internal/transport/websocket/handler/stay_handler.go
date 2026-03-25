@@ -10,6 +10,7 @@ import (
 	"github.com/Kenji-Uema/guestManager/internal/app"
 	"github.com/Kenji-Uema/guestManager/internal/domain"
 	"github.com/Kenji-Uema/guestManager/internal/domain/dto"
+	"github.com/Kenji-Uema/guestManager/internal/domain/enum"
 	"github.com/Kenji-Uema/guestManager/internal/transport/websocket/chat"
 )
 
@@ -151,7 +152,7 @@ func (h StayHandler) checkInDayRoutine(ctx context.Context, booking domain.Booki
 
 func isCheckoutToday(booking domain.Booking, timeEvent time.Time) bool {
 	today := timeEvent.UTC()
-	checkout := booking.StayPeriod.End.UTC()
+	checkout := booking.StayPeriod.CheckOut.UTC()
 
 	return checkout.Year() == today.Year() &&
 		checkout.Month() == today.Month() &&
@@ -185,7 +186,7 @@ func (h StayHandler) cleanCottage(ctx context.Context, cottageName string) error
 
 	slog.InfoContext(ctx, "received LEAVE_CLEANUP_NOTIFICATION", "message", msg)
 
-	cleaningRequest, err := domain.NewCleaningRequest(cottageName, domain.FullCleaning)
+	cleaningRequest, err := domain.NewCleaningOrder(cottageName, enum.FullCleaning)
 	if err != nil {
 		return err
 	}
@@ -206,7 +207,7 @@ func (h StayHandler) prepareCottageForSleep(ctx context.Context, cottageName str
 
 	slog.InfoContext(ctx, "received GO_FOR_DINNER", "message", msg)
 
-	cleaningRequest, err := domain.NewCleaningRequest(cottageName, domain.PrepareForSleep)
+	cleaningRequest, err := domain.NewCleaningOrder(cottageName, enum.PrepareForSleep)
 	if err != nil {
 		return err
 	}

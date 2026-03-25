@@ -14,18 +14,15 @@ import (
 
 type CheckinHandler struct {
 	receptionService app.ReceptionService
-	cleaningService  app.CleaningService
 	clock            port.ClockClient
 	writer           chat.Writer
 	reader           chat.Reader
 }
 
-func NewCheckinHandler(receptionService app.ReceptionService, cleaningService app.CleaningService,
-	clock port.ClockClient, writer chat.Writer, reader chat.Reader) *CheckinHandler {
+func NewCheckinHandler(receptionService app.ReceptionService, clock port.ClockClient, writer chat.Writer, reader chat.Reader) *CheckinHandler {
 
 	return &CheckinHandler{
 		receptionService: receptionService,
-		cleaningService:  cleaningService,
 		clock:            clock,
 		writer:           writer,
 		reader:           reader,
@@ -78,18 +75,22 @@ func (h CheckinHandler) Handle(ctx context.Context) (domain.Booking, error) {
 
 	slog.InfoContext(ctx, "checkin handler: checkin succeeded")
 
-	if err := h.prepareCottageForGuest(ctx, err, booking); err != nil {
-		slog.ErrorContext(ctx, "checkin handler: prepare cottage for guest", "error", err)
-		return domain.Booking{}, err
-	}
-
 	if err := h.writer.SendSystemNotification(ctx, dto.SystemNotification_CHECK_IN_COMPLETE); err != nil {
 		slog.ErrorContext(ctx, "checkin handler: send notification", "error", err)
 		return domain.Booking{}, err
 	}
 
-	if _, err := h.giveCottageKey(ctx); err != nil {
+	keyNumber, err := h.giveCottageKey(ctx)
+	if err != nil {
 		slog.ErrorContext(ctx, "checkin handler: give cottage key", "error", err)
+		return domain.Booking{}, err
+	}
+	if _, err := h.reader.WaitForGuestAction(ctx, dto.GuestAction_TAKE_COTTAGE_KEY); err != nil {
+		slog.ErrorContext(ctx, "checkin handler: wait for take cottage key", "error", err)
+		return domain.Booking{}, err
+	}
+	if err := h.receptionService.ReceiveCottageKey(ctx, booking.CottageName, keyNumber); err != nil {
+		slog.ErrorContext(ctx, "checkin handler: receive cottage key", "error", err)
 		return domain.Booking{}, err
 	}
 
@@ -136,19 +137,6 @@ func (h CheckinHandler) requestBookingID(ctx context.Context) (string, error) {
 		return "", ErrUnexpectedResponse
 	}
 	return guestResponse.GetShowBookingNumber().GetBookingId(), nil
-}
-
-func (h CheckinHandler) prepareCottageForGuest(ctx context.Context, err error, booking domain.Booking) error {
-	cleaningRequest, err := domain.NewCleaningRequest(booking.CottageName, domain.PrepareForGuest)
-	if err != nil {
-		slog.ErrorContext(ctx, "checkin handler: new cleaning request", "error", err)
-		return err
-	}
-
-	if err := h.cleaningService.CleanRoom(ctx, cleaningRequest); err != nil {
-		return err
-	}
-	return nil
 }
 
 func (h CheckinHandler) giveCottageKey(ctx context.Context) (string, error) {

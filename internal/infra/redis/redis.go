@@ -2,10 +2,12 @@ package redis
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/Kenji-Uema/guestManager/internal/config"
+	"github.com/Kenji-Uema/guestManager/internal/port"
 	goredis "github.com/redis/go-redis/v9"
 )
 
@@ -43,4 +45,16 @@ func (r *Redis) Close() error {
 
 func (r *Redis) Client() *goredis.Client {
 	return r.client
+}
+
+func (r *Redis) GetBytes(ctx context.Context, key string) ([]byte, error) {
+	value, err := r.client.Get(ctx, key).Bytes()
+	if errors.Is(err, goredis.Nil) {
+		return nil, port.ErrCacheMiss
+	}
+	return value, err
+}
+
+func (r *Redis) SetBytes(ctx context.Context, key string, value []byte, expiration time.Duration) error {
+	return r.client.Set(ctx, key, value, expiration).Err()
 }

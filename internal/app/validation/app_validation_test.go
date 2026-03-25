@@ -29,30 +29,6 @@ func TestValidator_EmailFormat(t *testing.T) {
 	}
 }
 
-func TestValidator_CleaningRequest(t *testing.T) {
-	testCases := map[string]struct {
-		input          string
-		isInputInvalid bool
-	}{
-		"do not clean":   {"DO_NOT_CLEAN", true},
-		"do not disturb": {"DO_NOT_DISTURB", false},
-		"clean":          {"CLEAN", false},
-	}
-
-	for caseName, test := range testCases {
-		t.Run(caseName, func(t *testing.T) {
-			err := New().CleaningRequest(test.input).Validate()
-
-			if test.isInputInvalid && err == nil {
-				t.Fatalf("expected validation error for %q, got nil", test.input)
-			}
-			if !test.isInputInvalid && err != nil {
-				t.Fatalf("expected no error for %s, got %v", test.input, err)
-			}
-		})
-	}
-}
-
 func TestValidator_Period(t *testing.T) {
 	var now = time.Now()
 	testCases := map[string]struct {

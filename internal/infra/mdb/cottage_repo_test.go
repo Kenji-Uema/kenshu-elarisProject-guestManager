@@ -6,12 +6,67 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Kenji-Uema/guestManager/internal/domain/enum"
 	"github.com/Kenji-Uema/guestManager/internal/domain/errors/dbErrors"
 	"github.com/Kenji-Uema/guestManager/internal/domain/errors/validationErrors"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 )
+
+func Test_cottageRepo_GetByName_ReturnsCottage(t *testing.T) {
+	setupAndRun("cottageRepo_GetByName returns cottage", t, func(t *testing.T, ct *mongo.Collection, br *mongo.Collection, gr *mongo.Collection) {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		r := &cottageRepo{collection: ct}
+		cottage, err := r.GetByName(ctx, "Lake House")
+		if err != nil {
+			t.Fatalf("GetByName() unexpected error: %v", err)
+		}
+
+		if cottage.Name != "Lake House" {
+			t.Fatalf("GetByName() unexpected cottage: %+v", cottage)
+		}
+		if cottage.View != "lake" {
+			t.Fatalf("GetByName() unexpected view: %+v", cottage)
+		}
+		if cottage.CurrentGuest.Hex() != "64b6f7c2c0f1e84c0a1a9c01" {
+			t.Fatalf("GetByName() unexpected current guest: %+v", cottage)
+		}
+		if cottage.CleaningStatus != enum.CleaningStatus("") {
+			t.Fatalf("GetByName() unexpected cleaning status: %+v", cottage)
+		}
+	})
+}
+
+func Test_cottageRepo_GetByName_NotFound(t *testing.T) {
+	setupAndRun("cottageRepo_GetByName not found", t, func(t *testing.T, ct *mongo.Collection, br *mongo.Collection, gr *mongo.Collection) {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		r := &cottageRepo{collection: ct}
+		_, err := r.GetByName(ctx, "Missing Cottage")
+		if err == nil {
+			t.Fatal("GetByName() expected error, got nil")
+		}
+	})
+}
+
+func Test_cottageRepo_GetByName_ValidatesInput(t *testing.T) {
+	setupAndRun("cottageRepo_GetByName validates input", t, func(t *testing.T, ct *mongo.Collection, br *mongo.Collection, gr *mongo.Collection) {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		r := &cottageRepo{collection: ct}
+		_, err := r.GetByName(ctx, "")
+
+		var validationErr *validationErrors.ErrValidationConstrain
+		if !errors.As(err, &validationErr) {
+			t.Fatalf("GetByName() expected validation error, got %v", err)
+		}
+	})
+}
 
 func Test_cottageRepo_UpdateCurrentGuest_UpdatesValue(t *testing.T) {
 	setupAndRun("cottageRepo_UpdateCurrentGuest updates value", t, func(t *testing.T, ct *mongo.Collection, br *mongo.Collection, gr *mongo.Collection) {
@@ -58,20 +113,81 @@ func Test_cottageRepo_UpdateCurrentGuest_ValidatesInput(t *testing.T) {
 		defer cancel()
 
 		r := &cottageRepo{collection: ct}
-		_, err := bson.ObjectIDFromHex("64b6f7c2c0f1e84c0a1a9c01") // ensure hex parse is covered
-		if err != nil {
-			t.Fatalf("failed to parse hex id: %v", err)
-		}
-
-		err = r.UpdateCurrentGuest(ctx, "", bson.NewObjectID())
+		err := r.UpdateCurrentGuest(ctx, "", bson.NewObjectID())
 		var validationErr *validationErrors.ErrValidationConstrain
 		if !errors.As(err, &validationErr) {
 			t.Fatalf("UpdateCurrentGuest() expected validation error for roomName, got %v", err)
 		}
+	})
+}
 
-		err = r.UpdateCurrentGuest(ctx, "Lake House", bson.NilObjectID)
+func Test_cottageRepo_UpdateKeyHolder_UpdatesValue(t *testing.T) {
+	setupAndRun("cottageRepo_UpdateKeyHolder updates value", t, func(t *testing.T, ct *mongo.Collection, br *mongo.Collection, gr *mongo.Collection) {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		r := &cottageRepo{collection: ct}
+
+		if err := r.UpdateKeyHolder(ctx, "Lake House", "key-9", enum.KeyHolderGuest); err != nil {
+			t.Fatalf("UpdateKeyHolder() unexpected error: %v", err)
+		}
+
+		var updated map[string]any
+		if err := ct.FindOne(ctx, bson.M{"name": "Lake House"}).Decode(&updated); err != nil {
+			t.Fatalf("failed to load updated cottage: %v", err)
+		}
+
+		key, ok := updated["key"].(bson.D)
+		if !ok {
+			t.Fatalf("UpdateKeyHolder() key type = %T, want bson.D", updated["key"])
+		}
+
+		var keyNumber any
+		var keyHolder any
+		for _, elem := range key {
+			switch elem.Key {
+			case "number":
+				keyNumber = elem.Value
+			case "holder":
+				keyHolder = elem.Value
+			}
+		}
+
+		if keyNumber != "key-9" {
+			t.Fatalf("UpdateKeyHolder() key.number = %v, want %q", keyNumber, "key-9")
+		}
+		if keyHolder != string(enum.KeyHolderGuest) {
+			t.Fatalf("UpdateKeyHolder() key.holder = %v, want %q", keyHolder, enum.KeyHolderGuest)
+		}
+	})
+}
+
+func Test_cottageRepo_UpdateKeyHolder_NotFound(t *testing.T) {
+	setupAndRun("cottageRepo_UpdateKeyHolder not found", t, func(t *testing.T, ct *mongo.Collection, br *mongo.Collection, gr *mongo.Collection) {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		r := &cottageRepo{collection: ct}
+		err := r.UpdateKeyHolder(ctx, "Missing Cottage", "key-9", enum.KeyHolderGuest)
+
+		var notFound *dbErrors.ErrCottageDoesNotExist
+		if !errors.As(err, &notFound) {
+			t.Fatalf("UpdateKeyHolder() expected ErrCottageDoesNotExist, got %v", err)
+		}
+	})
+}
+
+func Test_cottageRepo_UpdateKeyHolder_ValidatesInput(t *testing.T) {
+	setupAndRun("cottageRepo_UpdateKeyHolder validates input", t, func(t *testing.T, ct *mongo.Collection, br *mongo.Collection, gr *mongo.Collection) {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		r := &cottageRepo{collection: ct}
+		err := r.UpdateKeyHolder(ctx, "", "", "")
+
+		var validationErr *validationErrors.ErrValidationConstrain
 		if !errors.As(err, &validationErr) {
-			t.Fatalf("UpdateCurrentGuest() expected validation error for guestId, got %v", err)
+			t.Fatalf("UpdateKeyHolder() expected validation error, got %v", err)
 		}
 	})
 }

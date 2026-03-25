@@ -6,14 +6,9 @@ import (
 	"github.com/Kenji-Uema/guestManager/internal/app/validation"
 )
 
-type CottageAvailablePeriod struct {
-	name    string
-	periods []Period
-}
-
 type Period struct {
-	Start time.Time
-	End   time.Time
+	CheckIn  time.Time
+	CheckOut time.Time
 }
 
 func NewPeriod(start, end time.Time) (Period, error) {

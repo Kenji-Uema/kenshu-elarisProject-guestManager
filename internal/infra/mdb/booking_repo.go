@@ -8,6 +8,7 @@ import (
 	"github.com/Kenji-Uema/guestManager/internal/app/validation"
 	"github.com/Kenji-Uema/guestManager/internal/config"
 	"github.com/Kenji-Uema/guestManager/internal/domain/documents"
+	"github.com/Kenji-Uema/guestManager/internal/domain/enum"
 	"github.com/Kenji-Uema/guestManager/internal/domain/errors/dbErrors"
 	"github.com/Kenji-Uema/guestManager/internal/port"
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -55,7 +56,7 @@ func (b *bookingRepo) FindByCheckInDate(ctx context.Context, date time.Time) ([]
 	nextDay := startOfDay.Add(24 * time.Hour)
 
 	filter := bson.M{
-		"stay_period.start": bson.M{
+		"stay_period.checkin": bson.M{
 			"$gte": startOfDay,
 			"$lt":  nextDay,
 		},
@@ -88,8 +89,8 @@ func (b *bookingRepo) FindByGuestIdAndCheckIn(ctx context.Context, guestId bson.
 	}
 
 	filter := bson.M{
-		"main_guest":        guestId,
-		"stay_period.start": checkIn,
+		"main_guest":          guestId,
+		"stay_period.checkin": checkIn,
 	}
 
 	var booking documents.Booking
@@ -127,4 +128,24 @@ func (b *bookingRepo) FindByGuestIdAndBookingNumber(ctx context.Context, guestId
 	}
 
 	return booking, nil
+}
+
+func (b *bookingRepo) UpdateStatus(ctx context.Context, bookingId bson.ObjectID, status enum.BookingStatus) error {
+	if err := validation.New().
+		NotNilObjectID("bookingId", bookingId).
+		NotBlank("status", string(status)).
+		Validate(); err != nil {
+		return err
+	}
+
+	result, err := b.collection.UpdateOne(ctx, bson.M{"_id": bookingId}, bson.M{"$set": bson.M{"status": status}})
+	if err != nil {
+		return fmt.Errorf("%w: could not update booking status for bookingId=%s: %v",
+			dbErrors.ErrBookingRepo, bookingId.Hex(), err)
+	}
+	if result.MatchedCount == 0 {
+		return fmt.Errorf("%w: could not find booking for bookingId=%s", dbErrors.ErrBookingRepo, bookingId.Hex())
+	}
+
+	return nil
 }

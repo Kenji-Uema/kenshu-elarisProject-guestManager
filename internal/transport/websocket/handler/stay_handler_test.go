@@ -10,6 +10,7 @@ import (
 	appfakes "github.com/Kenji-Uema/guestManager/internal/app/fakes"
 	"github.com/Kenji-Uema/guestManager/internal/domain"
 	"github.com/Kenji-Uema/guestManager/internal/domain/dto"
+	"github.com/Kenji-Uema/guestManager/internal/domain/enum"
 	mqfakes "github.com/Kenji-Uema/guestManager/internal/infra/mq/fakes"
 	chatfakes "github.com/Kenji-Uema/guestManager/internal/transport/websocket/chat/fakes"
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -70,7 +71,7 @@ func TestStayHandlerHandle(t *testing.T) {
 			notifications = append(notifications, notification)
 			return nil
 		}
-		fakeCleaning.CleanRoomFn = func(ctx context.Context, request domain.CleaningRequest) error {
+		fakeCleaning.CleanRoomFn = func(ctx context.Context, request domain.CleaningOrder) error {
 			return nil
 		}
 
@@ -176,7 +177,7 @@ func TestStayHandlerStayRoutine(t *testing.T) {
 
 	waitedActions := make([]dto.GuestAction, 0, 2)
 	ackedActions := 0
-	cleaningRequests := make([]domain.CleaningRequest, 0, 2)
+	cleaningRequests := make([]domain.CleaningOrder, 0, 2)
 
 	fakeReader.AckGuestActionFn = func(ctx context.Context) error {
 		ackedActions++
@@ -188,7 +189,7 @@ func TestStayHandlerStayRoutine(t *testing.T) {
 			Payload: &dto.ChatMessage_GuestAction{GuestAction: action},
 		}, nil
 	}
-	fakeCleaning.CleanRoomFn = func(ctx context.Context, request domain.CleaningRequest) error {
+	fakeCleaning.CleanRoomFn = func(ctx context.Context, request domain.CleaningOrder) error {
 		cleaningRequests = append(cleaningRequests, request)
 		return nil
 	}
@@ -213,10 +214,10 @@ func TestStayHandlerStayRoutine(t *testing.T) {
 	if len(cleaningRequests) != 2 {
 		t.Fatalf("stayRoutine() cleaning requests len = %d, want 2", len(cleaningRequests))
 	}
-	if cleaningRequests[0].RoomName != booking.CottageName || cleaningRequests[0].RequestType != domain.FullCleaning {
+	if cleaningRequests[0].RoomName != booking.CottageName || cleaningRequests[0].RequestType != enum.FullCleaning {
 		t.Fatalf("stayRoutine() first cleaning request = %+v", cleaningRequests[0])
 	}
-	if cleaningRequests[1].RoomName != booking.CottageName || cleaningRequests[1].RequestType != domain.PrepareForSleep {
+	if cleaningRequests[1].RoomName != booking.CottageName || cleaningRequests[1].RequestType != enum.PrepareForSleep {
 		t.Fatalf("stayRoutine() second cleaning request = %+v", cleaningRequests[1])
 	}
 }
@@ -257,7 +258,7 @@ func TestStayHandlerCheckInDayRoutine(t *testing.T) {
 	if fakeCleaning.CleanRoomCallCount != 1 {
 		t.Fatalf("checkInDayRoutine() cleaning calls = %d, want 1", fakeCleaning.CleanRoomCallCount)
 	}
-	if fakeCleaning.LastCleaningRequest.RoomName != booking.CottageName || fakeCleaning.LastCleaningRequest.RequestType != domain.PrepareForSleep {
+	if fakeCleaning.LastCleaningRequest.RoomName != booking.CottageName || fakeCleaning.LastCleaningRequest.RequestType != enum.PrepareForSleep {
 		t.Fatalf("checkInDayRoutine() cleaning request = %+v", fakeCleaning.LastCleaningRequest)
 	}
 }

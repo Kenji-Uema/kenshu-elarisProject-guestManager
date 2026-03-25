@@ -136,7 +136,7 @@ func newTestWs(t *testing.T) *Ws {
 		&appfakes.ReceptionService{},
 		&appfakes.CleaningService{},
 		nil,
-		&stubNotificationService{},
+		&appfakes.NotificationService{},
 		timeEvents,
 	)
 }
@@ -146,7 +146,7 @@ func stubHandlerFactories(checkin *handlerfakes.CheckinHandler, stay *handlerfak
 	prevStay := newStayHandler
 	prevCheckout := newCheckoutHandler
 
-	newCheckinHandler = func(receptionService app.ReceptionService, cleaningService app.CleaningService,
+	newCheckinHandler = func(receptionService app.ReceptionService,
 		clock port.ClockClient, writer chat.Writer, reader chat.Reader) checkinHandler {
 		return checkin
 	}
@@ -181,7 +181,12 @@ func runWebsocketRequest(t *testing.T, ws *Ws) {
 	if err != nil {
 		t.Fatalf("websocket dial error = %v", err)
 	}
-	defer conn.Close()
+	defer func(conn *websocket.Conn) {
+		err := conn.Close()
+		if err != nil {
+			t.Fatalf("websocket close error = %v", err)
+		}
+	}(conn)
 }
 
 func testBooking(t *testing.T, cottage string) domain.Booking {

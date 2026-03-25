@@ -7,6 +7,7 @@ import (
 	"github.com/Kenji-Uema/guestManager/internal/app/validation"
 	"github.com/Kenji-Uema/guestManager/internal/config"
 	"github.com/Kenji-Uema/guestManager/internal/domain/documents"
+	"github.com/Kenji-Uema/guestManager/internal/domain/enum"
 	"github.com/Kenji-Uema/guestManager/internal/domain/errors/dbErrors"
 	"github.com/Kenji-Uema/guestManager/internal/port"
 
@@ -52,6 +53,33 @@ func (r *cottageRepo) UpdateCurrentGuest(ctx context.Context, roomName string, g
 			dbErrors.ErrCottageRepo, roomName, guestId.Hex(), err)
 	}
 
+	if result.MatchedCount == 0 {
+		return &dbErrors.ErrCottageDoesNotExist{CottageName: roomName}
+	}
+
+	return nil
+}
+
+func (r *cottageRepo) UpdateKeyHolder(ctx context.Context, roomName string, keyNumber string, holder enum.KeyHolder) error {
+	if err := validation.New().
+		NotBlank("roomName", roomName).
+		NotBlank("keyNumber", keyNumber).
+		NotBlank("holder", string(holder)).
+		Validate(); err != nil {
+		return err
+	}
+
+	filter := bson.M{"name": roomName}
+	update := bson.M{"$set": bson.M{
+		"key.number": keyNumber,
+		"key.holder": holder,
+	}}
+
+	result, err := r.collection.UpdateOne(ctx, filter, update)
+	if err != nil {
+		return fmt.Errorf("%w: could not update key holder for roomName=%s keyNumber=%s: %v",
+			dbErrors.ErrCottageRepo, roomName, keyNumber, err)
+	}
 	if result.MatchedCount == 0 {
 		return &dbErrors.ErrCottageDoesNotExist{CottageName: roomName}
 	}

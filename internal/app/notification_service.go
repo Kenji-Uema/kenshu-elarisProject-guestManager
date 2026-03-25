@@ -9,8 +9,7 @@ import (
 	"time"
 
 	"github.com/Kenji-Uema/guestManager/internal/domain"
-	"github.com/Kenji-Uema/guestManager/internal/infra/redis"
-	goredis "github.com/redis/go-redis/v9"
+	"github.com/Kenji-Uema/guestManager/internal/port"
 )
 
 type NotificationService interface {
@@ -19,11 +18,11 @@ type NotificationService interface {
 }
 type notificationService struct {
 	timeEventService TimeEventService
-	redis            *redis.Redis
+	cache            port.Cache
 }
 
-func NewNotificationService(timeEventService TimeEventService, redis *redis.Redis) NotificationService {
-	return &notificationService{timeEventService: timeEventService, redis: redis}
+func NewNotificationService(timeEventService TimeEventService, cache port.Cache) NotificationService {
+	return &notificationService{timeEventService: timeEventService, cache: cache}
 }
 
 func (n notificationService) HourNotification(ctx context.Context, timerCh chan interface{}, hour int) {
@@ -76,9 +75,9 @@ func (n notificationService) CheckOutNotification(ctx context.Context, bookingCh
 
 			redisKey := fmt.Sprintf("checkout.%s", eventTime.AddDate(0, 0, 1).UTC().Format("2006-01-02"))
 
-			payload, err := n.redis.Client().Get(ctx, redisKey).Bytes()
+			payload, err := n.cache.GetBytes(ctx, redisKey)
 			if err != nil {
-				if errors.Is(err, goredis.Nil) {
+				if errors.Is(err, port.ErrCacheMiss) {
 					slog.DebugContext(ctx, "notification service: no checkout bookings in redis for next day",
 						"redis_key", redisKey, "event_time", eventTime)
 					continue

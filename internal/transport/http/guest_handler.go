@@ -74,6 +74,7 @@ func (h guestHandler) AddGuest(c *gin.Context) {
 		guestRequest.GivenNames,
 		guestRequest.Surname,
 		guestRequest.Email,
+		guestRequest.BillingAddress,
 		createdTime,
 		nil,
 	)
@@ -120,13 +121,19 @@ func (h guestHandler) UpdateGuest(c *gin.Context) {
 		return
 	}
 
+	initialCreatedAt := updatedRequest.CreatedAt
+	if initialCreatedAt == nil {
+		initialCreatedAt = createdTime
+	}
+
 	updatedGuest, err := domain.NewGuest(
-		bson.NewObjectID(),
+		targetGuestId,
 		updatedRequest.DocumentId,
 		updatedRequest.GivenNames,
 		updatedRequest.Surname,
 		updatedRequest.Email,
-		nil,
+		updatedRequest.BillingAddress,
+		initialCreatedAt,
 		createdTime,
 	)
 	if err != nil {
@@ -141,7 +148,7 @@ func (h guestHandler) UpdateGuest(c *gin.Context) {
 		return
 	}
 
-	c.JSON(200, resultedGuest)
+	c.JSON(200, resultedGuest.ToDto())
 }
 
 func (h guestHandler) GetBookings(c *gin.Context) {
@@ -165,7 +172,7 @@ func (h guestHandler) GetBookings(c *gin.Context) {
 		return
 	}
 
-	bookingsDto := make([]dto.BookingDto, len(bookingsDomain))
+	bookingsDto := make([]dto.BookingDto, 0, len(bookingsDomain))
 	for _, booking := range bookingsDomain {
 		bookingsDto = append(bookingsDto, booking.ToDto())
 	}

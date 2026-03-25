@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Kenji-Uema/guestManager/internal/domain/enum"
 	"github.com/Kenji-Uema/guestManager/internal/domain/errors/validationErrors"
 	"go.mongodb.org/mongo-driver/v2/bson"
 
@@ -119,6 +120,56 @@ func Test_bookingRepo_FindByGuestIdAndCheckIn_ValidatesInput(t *testing.T) {
 	})
 }
 
+func Test_bookingRepo_FindByGuestIdAndBookingNumber_ReturnsBooking(t *testing.T) {
+	setupAndRun("bookingRepo_FindByGuestIdAndBookingNumber returns booking", t, func(t *testing.T, ct *mongo.Collection, br *mongo.Collection, gr *mongo.Collection) {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		guestID, err := bson.ObjectIDFromHex("64b6f7c2c0f1e84c0a1a9c01")
+		if err != nil {
+			t.Fatalf("failed to parse hex guest id: %v", err)
+		}
+
+		r := &bookingRepo{collection: br}
+		booking, err := r.FindByGuestIdAndBookingNumber(ctx, guestID, "64b6f7c2c0f1e84c0a1a9d01")
+		if err != nil {
+			t.Fatalf("FindByGuestIdAndBookingNumber() unexpected error: %v", err)
+		}
+
+		if booking.CottageName != "Lake House" {
+			t.Fatalf("FindByGuestIdAndBookingNumber() unexpected cottage name: %+v", booking)
+		}
+	})
+}
+
+func Test_bookingRepo_FindByGuestIdAndBookingNumber_ReturnsErrorWhenNone(t *testing.T) {
+	setupAndRun("bookingRepo_FindByGuestIdAndBookingNumber returns error when none", t, func(t *testing.T, ct *mongo.Collection, br *mongo.Collection, gr *mongo.Collection) {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		r := &bookingRepo{collection: br}
+		_, err := r.FindByGuestIdAndBookingNumber(ctx, bson.NewObjectID(), "64b6f7c2c0f1e84c0a1a9d01")
+		if err == nil {
+			t.Fatal("FindByGuestIdAndBookingNumber() expected error, got nil")
+		}
+	})
+}
+
+func Test_bookingRepo_FindByGuestIdAndBookingNumber_ValidatesInput(t *testing.T) {
+	setupAndRun("bookingRepo_FindByGuestIdAndBookingNumber validates input", t, func(t *testing.T, ct *mongo.Collection, br *mongo.Collection, gr *mongo.Collection) {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		r := &bookingRepo{collection: br}
+		_, err := r.FindByGuestIdAndBookingNumber(ctx, bson.NilObjectID, "")
+
+		var validationErr *validationErrors.ErrValidationConstrain
+		if !errors.As(err, &validationErr) {
+			t.Fatalf("FindByGuestIdAndBookingNumber() expected validation error, got %v", err)
+		}
+	})
+}
+
 func Test_bookingRepo_FindBookingByCheckInDate_ReturnsBookings(t *testing.T) {
 	setupAndRun("bookingRepo_FindBookingByCheckInDate returns bookings", t, func(t *testing.T, ct *mongo.Collection, br *mongo.Collection, gr *mongo.Collection) {
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -175,6 +226,46 @@ func Test_bookingRepo_FindBookingByCheckInDate_ValidatesInput(t *testing.T) {
 		var validationErr *validationErrors.ErrValidationConstrain
 		if !errors.As(err, &validationErr) {
 			t.Fatalf("FindByCheckInDate() expected validation error, got %v", err)
+		}
+	})
+}
+
+func Test_bookingRepo_UpdateStatus_UpdatesBooking(t *testing.T) {
+	setupAndRun("bookingRepo_UpdateStatus updates booking", t, func(t *testing.T, ct *mongo.Collection, br *mongo.Collection, gr *mongo.Collection) {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		bookingID, err := bson.ObjectIDFromHex("64b6f7c2c0f1e84c0a1a9d01")
+		if err != nil {
+			t.Fatalf("failed to parse booking id: %v", err)
+		}
+
+		r := &bookingRepo{collection: br}
+		if err := r.UpdateStatus(ctx, bookingID, enum.BookingStatusPast); err != nil {
+			t.Fatalf("UpdateStatus() unexpected error: %v", err)
+		}
+
+		var updated bson.M
+		if err := br.FindOne(ctx, bson.M{"_id": bookingID}).Decode(&updated); err != nil {
+			t.Fatalf("FindOne() unexpected error: %v", err)
+		}
+		if updated["status"] != string(enum.BookingStatusPast) {
+			t.Fatalf("UpdateStatus() status = %v, want %q", updated["status"], enum.BookingStatusPast)
+		}
+	})
+}
+
+func Test_bookingRepo_UpdateStatus_ValidatesInput(t *testing.T) {
+	setupAndRun("bookingRepo_UpdateStatus validates input", t, func(t *testing.T, ct *mongo.Collection, br *mongo.Collection, gr *mongo.Collection) {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		r := &bookingRepo{collection: br}
+		err := r.UpdateStatus(ctx, bson.NilObjectID, "")
+
+		var validationErr *validationErrors.ErrValidationConstrain
+		if !errors.As(err, &validationErr) {
+			t.Fatalf("UpdateStatus() expected validation error, got %v", err)
 		}
 	})
 }

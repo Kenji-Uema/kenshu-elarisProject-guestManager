@@ -98,6 +98,7 @@ func (g *guestRepo) Update(ctx context.Context, id bson.ObjectID, updatedGuest d
 	setStringIfChanged(updateFields, "given_names", &existingGuest.GivenNames, updatedGuest.GivenNames)
 	setStringIfChanged(updateFields, "surname", &existingGuest.Surname, updatedGuest.Surname)
 	setStringIfChanged(updateFields, "email", &existingGuest.Email, updatedGuest.Email)
+	setStringIfChanged(updateFields, "billing_address", &existingGuest.BillingAddress, updatedGuest.BillingAddress)
 
 	if len(updateFields) == 0 {
 		return existingGuest, nil
