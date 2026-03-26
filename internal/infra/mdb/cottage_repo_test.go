@@ -34,8 +34,11 @@ func Test_cottageRepo_GetByName_ReturnsCottage(t *testing.T) {
 		if cottage.CurrentGuest.Hex() != "64b6f7c2c0f1e84c0a1a9c01" {
 			t.Fatalf("GetByName() unexpected current guest: %+v", cottage)
 		}
-		if cottage.CleaningStatus != enum.CleaningStatus("") {
+		if cottage.CleaningStatus != enum.FullyCleaned {
 			t.Fatalf("GetByName() unexpected cleaning status: %+v", cottage)
+		}
+		if cottage.Key.Number != "lake-house-key-1" || cottage.Key.Holder != enum.KeyHolderCottage {
+			t.Fatalf("GetByName() unexpected key: %+v", cottage.Key)
 		}
 	})
 }

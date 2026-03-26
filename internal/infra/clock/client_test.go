@@ -16,9 +16,14 @@ import (
 )
 
 func TestNewClockEmu(t *testing.T) {
-	clockClient, err := NewClockEmu(config.ClockEmuConfig{
-		GrpcHost: "localhost",
-		GrpcPort: 50051,
+	clockClient, err := NewClockEmu(config.Services{
+		ClockSimulator: struct {
+			GrpcHost string `env:"CLOCK_EMU_GRPC_HOST,required"`
+			GrpcPort int    `env:"CLOCK_EMU_GRPC_PORT,required"`
+		}{
+			GrpcHost: "localhost",
+			GrpcPort: 50051,
+		},
 	})
 	if err != nil {
 		t.Fatalf("NewClockEmu() error = %v", err)

@@ -13,6 +13,11 @@
     "photos": ["lake-1.jpg", "lake-2.jpg"],
     "price_per_night": 220,
     "bookings": [{ "$oid": "64b6f7c2c0f1e84c0a1a9d01" }],
-    "current_guest": { "$oid": "64b6f7c2c0f1e84c0a1a9c01" }
+    "current_guest": { "$oid": "64b6f7c2c0f1e84c0a1a9c01" },
+    "cleaning_status": "fully_cleaned",
+    "key": {
+      "number": "lake-house-key-1",
+      "holder": "cottage"
+    }
   }
 ]

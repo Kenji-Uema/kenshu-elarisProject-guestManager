@@ -10,6 +10,33 @@ import (
 	portfakes "github.com/Kenji-Uema/guestManager/internal/port/fakes"
 )
 
+func TestNewNotificationService(t *testing.T) {
+	t.Run("returns error for nil dependencies", func(t *testing.T) {
+		service, err := NewNotificationService(nil, nil)
+		if err == nil {
+			t.Fatal("NewNotificationService() error = nil, want non-nil")
+		}
+		if service != nil {
+			t.Fatalf("NewNotificationService() service = %v, want nil", service)
+		}
+	})
+
+	t.Run("returns service for valid dependencies", func(t *testing.T) {
+		timeEvents, err := NewTimeEventService(&mqfakes.FakeMqConsumer{}, &mqfakes.FakeMqConsumer{})
+		if err != nil {
+			t.Fatalf("NewTimeEventService() error = %v", err)
+		}
+
+		service, err := NewNotificationService(timeEvents, &portfakes.FakeCache{})
+		if err != nil {
+			t.Fatalf("NewNotificationService() error = %v", err)
+		}
+		if service == nil {
+			t.Fatal("NewNotificationService() service = nil, want non-nil")
+		}
+	})
+}
+
 func TestNotificationServiceHourNotification(t *testing.T) {
 	t.Run("publishes notification for matching hour only", func(t *testing.T) {
 		service, timeEvents := newTestNotificationService(t)
@@ -127,7 +154,10 @@ func newTestNotificationService(t *testing.T) (*notificationService, *timeEventS
 		t.Fatalf("NewTimeEventService() returned %T, want *timeEventService", timeEvents)
 	}
 
-	service := NewNotificationService(concreteTimeEvents, &portfakes.FakeCache{})
+	service, err := NewNotificationService(concreteTimeEvents, &portfakes.FakeCache{})
+	if err != nil {
+		t.Fatalf("NewNotificationService() error = %v", err)
+	}
 	concreteService, ok := service.(*notificationService)
 	if !ok {
 		t.Fatalf("NewNotificationService() returned %T, want *notificationService", service)

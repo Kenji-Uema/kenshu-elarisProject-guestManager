@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/Kenji-Uema/guestManager/internal/app/validation"
-	"github.com/Kenji-Uema/guestManager/internal/config"
 	"github.com/Kenji-Uema/guestManager/internal/domain/documents"
 	"github.com/Kenji-Uema/guestManager/internal/domain/enum"
 	"github.com/Kenji-Uema/guestManager/internal/domain/errors/dbErrors"
@@ -19,8 +18,8 @@ type bookingRepo struct {
 	collection *mongo.Collection
 }
 
-func NewBookingRepo(db *mongo.Database, config config.BookingCollectionConfig) port.BookingRepo {
-	return &bookingRepo{collection: db.Collection(config.Name)}
+func NewBookingRepo(db *mongo.Database, collectionName string) port.BookingRepo {
+	return &bookingRepo{collection: db.Collection(collectionName)}
 }
 
 func (b *bookingRepo) FindByGuestId(ctx context.Context, guestId bson.ObjectID) ([]documents.Booking, error) {

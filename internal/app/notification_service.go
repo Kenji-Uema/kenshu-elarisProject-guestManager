@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/Kenji-Uema/guestManager/internal/app/validation"
 	"github.com/Kenji-Uema/guestManager/internal/domain"
 	"github.com/Kenji-Uema/guestManager/internal/port"
 )
@@ -21,8 +22,22 @@ type notificationService struct {
 	cache            port.Cache
 }
 
-func NewNotificationService(timeEventService TimeEventService, cache port.Cache) NotificationService {
-	return &notificationService{timeEventService: timeEventService, cache: cache}
+func NewNotificationService(timeEventService TimeEventService, cache port.Cache) (NotificationService, error) {
+	if timeEventService == nil {
+		return nil, fmt.Errorf("NewNotificationService: timeEventService is required")
+	}
+	if cache == nil {
+		return nil, fmt.Errorf("NewNotificationService: cache is required")
+	}
+
+	if err := validation.New().
+		NotZeroValue("timeEventService", timeEventService).
+		NotZeroValue("cache", cache).
+		Validate(); err != nil {
+		return nil, fmt.Errorf("NewNotificationService: %w", err)
+	}
+
+	return &notificationService{timeEventService: timeEventService, cache: cache}, nil
 }
 
 func (n notificationService) HourNotification(ctx context.Context, timerCh chan interface{}, hour int) {

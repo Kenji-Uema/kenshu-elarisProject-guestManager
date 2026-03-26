@@ -7,7 +7,6 @@ import (
 	"log/slog"
 
 	"github.com/Kenji-Uema/guestManager/internal/app/validation"
-	"github.com/Kenji-Uema/guestManager/internal/config"
 	"github.com/Kenji-Uema/guestManager/internal/domain/documents"
 	"github.com/Kenji-Uema/guestManager/internal/domain/errors/dbErrors"
 	"github.com/Kenji-Uema/guestManager/internal/port"
@@ -20,8 +19,8 @@ type guestRepo struct {
 	collection *mongo.Collection
 }
 
-func NewGuestRepo(db *mongo.Database, config config.GuestCollectionConfig) port.GuestRepo {
-	return &guestRepo{collection: db.Collection(config.Name)}
+func NewGuestRepo(db *mongo.Database, collectionName string) port.GuestRepo {
+	return &guestRepo{collection: db.Collection(collectionName)}
 }
 
 func (g *guestRepo) GetById(ctx context.Context, id bson.ObjectID) (documents.Guest, error) {
