@@ -31,6 +31,20 @@ make build
 make docker-build/home/kenjiuema/Documents/projects/guestManager/internal/infra/mq/fakes
 ```
 
+## Test
+
+```sh
+make test
+make test-unit
+make test-container
+make test-integration
+```
+
+`make test` runs the safe default set and skips container-heavy suites.
+`make test-unit` is the same safe default path.
+`make test-container` runs the repository and MQ tests that require Docker.
+`make test-integration` runs the integration suite by itself.
+
 ## Configuration/home/kenjiuema/Documents/projects/guestManager/internal/infra/mq/.testcontainers-tmp-2822467785/home/kenjiuema/Documents/projects/guestManager/internal/infra/mq/rabbitmq_test.go
 
 Configuration is environment-driven. See:

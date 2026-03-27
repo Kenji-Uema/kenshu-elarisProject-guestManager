@@ -18,6 +18,9 @@ type Mdb struct {
 }
 
 func NewMongoDb(ctx context.Context, config config.MongoConfig) (*Mdb, error) {
+	startCtx, cancel := context.WithTimeout(ctx, time.Duration(config.StartupTimeoutInSeconds)*time.Second)
+	defer cancel()
+
 	uri := buildMongoURI(config.Username, config.Password, config.Host)
 
 	clientOptions := options.Client().
@@ -25,14 +28,23 @@ func NewMongoDb(ctx context.Context, config config.MongoConfig) (*Mdb, error) {
 		SetMonitor(otelmongo.NewMonitor(
 			otelmongo.WithCommandAttributeDisabled(true),
 		)).
-		SetConnectTimeout(10 * time.Second)
+		SetConnectTimeout(time.Duration(config.ConnectionTimeoutInSeconds) * time.Second).
+		SetServerSelectionTimeout(time.Duration(config.ServerSelectionTimeoutInSeconds) * time.Second).
+		SetMaxConnIdleTime(time.Duration(config.MaxConnIdleTimeInSeconds) * time.Second).
+		SetMaxPoolSize(config.MaxPoolSize).
+		SetMinPoolSize(config.MinPoolSize).
+		SetRetryWrites(config.RetryWrites)
+	if config.ReplicaSet != "" {
+		clientOptions.SetReplicaSet(config.ReplicaSet)
+	}
+
 	client, err := mongo.Connect(clientOptions)
 
 	if err != nil {
 		return nil, err
 	}
 
-	databaseContext, databaseCancel := context.WithTimeout(ctx, 5*time.Second)
+	databaseContext, databaseCancel := context.WithTimeout(startCtx, time.Duration(config.PingTimeoutInSeconds)*time.Second)
 	defer databaseCancel()
 
 	if err := client.Ping(databaseContext, readpref.Primary()); err != nil {

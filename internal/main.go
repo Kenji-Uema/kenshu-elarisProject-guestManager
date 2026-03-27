@@ -108,8 +108,12 @@ func main() {
 	)
 
 	server := &http.Server{
-		Addr:    fmt.Sprintf("%s:%d", configs.AppConfig.Server.Host, configs.AppConfig.Server.Port),
-		Handler: router,
+		Addr:              fmt.Sprintf("%s:%d", configs.AppConfig.Server.Host, configs.AppConfig.Server.Port),
+		Handler:           router,
+		ReadHeaderTimeout: time.Duration(configs.AppConfig.Server.ReadHeaderTimeoutInSeconds) * time.Second,
+		ReadTimeout:       time.Duration(configs.AppConfig.Server.ReadTimeoutInSeconds) * time.Second,
+		WriteTimeout:      time.Duration(configs.AppConfig.Server.WriteTimeoutInSeconds) * time.Second,
+		IdleTimeout:       time.Duration(configs.AppConfig.Server.IdleTimeoutInSeconds) * time.Second,
 	}
 	started = true
 
