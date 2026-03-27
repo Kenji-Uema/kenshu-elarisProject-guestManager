@@ -54,20 +54,40 @@ func TestMain(m *testing.M) {
 }
 
 func prepareTestcontainersTempDir() (func(), error) {
-	tempDir, err := os.MkdirTemp(".", ".testcontainers-tmp-")
+	tempRoot, err := os.MkdirTemp("", "guestmanager-mq-testcontainers-*")
 	if err != nil {
 		return nil, err
 	}
 
+	tempDir, err := os.MkdirTemp(tempRoot, "tmp-")
+	if err != nil {
+		_ = os.RemoveAll(tempRoot)
+		return nil, err
+	}
+
+	previousEnv := map[string]string{
+		"TMPDIR": os.Getenv("TMPDIR"),
+		"TMP":    os.Getenv("TMP"),
+		"TEMP":   os.Getenv("TEMP"),
+	}
+
 	for _, key := range []string{"TMPDIR", "TMP", "TEMP"} {
 		if err := os.Setenv(key, tempDir); err != nil {
-			_ = os.RemoveAll(tempDir)
+			_ = os.RemoveAll(tempRoot)
 			return nil, err
 		}
 	}
 
 	return func() {
-		_ = os.RemoveAll(tempDir)
+		for key, value := range previousEnv {
+			if value == "" {
+				_ = os.Unsetenv(key)
+				continue
+			}
+			_ = os.Setenv(key, value)
+		}
+
+		_ = os.RemoveAll(tempRoot)
 	}, nil
 }
 
