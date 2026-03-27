@@ -427,8 +427,8 @@ func TestStayHandlerNotifyCheckoutToday(t *testing.T) {
 		handler := NewStayHandler(fakeNotifications, &appfakes.CleaningService{}, nil, fakeWriter, &chatfakes.Reader{})
 
 		ctx, cancel := context.WithCancel(context.Background())
-		fakeNotifications.CheckOutNotificationFn = func(ctx context.Context, bookingCh chan []domain.Booking) {
-			<-ctx.Done()
+		fakeWriter.SendSystemNotificationFn = func(ctx context.Context, notification dto.SystemNotification) error {
+			return ctx.Err()
 		}
 
 		cancel()
@@ -437,8 +437,8 @@ func TestStayHandlerNotifyCheckoutToday(t *testing.T) {
 		if !errors.Is(err, context.Canceled) {
 			t.Fatalf("notifyCheckoutToday() error = %v, want %v", err, context.Canceled)
 		}
-		if fakeWriter.SendSystemNotificationCallCount != 0 {
-			t.Fatalf("notifyCheckoutToday() notification calls = %d, want 0", fakeWriter.SendSystemNotificationCallCount)
+		if fakeWriter.SendSystemNotificationCallCount != 1 {
+			t.Fatalf("notifyCheckoutToday() notification calls = %d, want 1", fakeWriter.SendSystemNotificationCallCount)
 		}
 	})
 }

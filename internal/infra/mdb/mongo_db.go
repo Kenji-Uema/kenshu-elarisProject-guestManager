@@ -18,7 +18,7 @@ type Mdb struct {
 }
 
 func NewMongoDb(ctx context.Context, config config.MongoConfig) (*Mdb, error) {
-	uri := fmt.Sprintf("mongodb://%s:%s@%s", config.Username, config.Password, config.Host)
+	uri := buildMongoURI(config.Username, config.Password, config.Host)
 
 	clientOptions := options.Client().
 		ApplyURI(uri).
@@ -41,6 +41,10 @@ func NewMongoDb(ctx context.Context, config config.MongoConfig) (*Mdb, error) {
 	}
 
 	return &Mdb{client: client, Database: client.Database(config.Database)}, nil
+}
+
+func buildMongoURI(username config.Secret, password config.Secret, host string) string {
+	return fmt.Sprintf("mongodb://%s:%s@%s", string(username), string(password), host)
 }
 
 func (d *Mdb) Ping() error {

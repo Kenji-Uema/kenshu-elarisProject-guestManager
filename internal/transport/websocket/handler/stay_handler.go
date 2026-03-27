@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"time"
 
 	"github.com/Kenji-Uema/guestManager/internal/app"
@@ -46,13 +45,13 @@ func (h StayHandler) Handle(ctx context.Context, booking domain.Booking) error {
 	go func() {
 		err := h.notifyBreakfast(notificationCtx)
 		if err != nil {
-			slog.ErrorContext(notificationCtx, "stay handler: notify breakfast", "error", err)
+			logHandlerError(notificationCtx, "breakfast_notification_failed", "error", err)
 		}
 	}()
 	go func() {
 		err := h.notifyDinner(notificationCtx)
 		if err != nil {
-			slog.ErrorContext(notificationCtx, "stay handler: notify dinner", "error", err)
+			logHandlerError(notificationCtx, "dinner_notification_failed", "error", err)
 		}
 	}()
 
@@ -61,7 +60,7 @@ func (h StayHandler) Handle(ctx context.Context, booking domain.Booking) error {
 	}
 
 	if _, err := h.waitDayChangeEvent(ctx, dayChangeEvents); err != nil {
-		slog.ErrorContext(ctx, "stay handler: wait day change event", "error", err)
+		logHandlerError(ctx, "day_change_wait_failed", "error", err)
 		return err
 	}
 
@@ -72,7 +71,7 @@ func (h StayHandler) Handle(ctx context.Context, booking domain.Booking) error {
 
 		timeEvent, err := h.waitDayChangeEvent(ctx, dayChangeEvents)
 		if err != nil {
-			slog.ErrorContext(ctx, "stay handler: wait day change event", "error", err)
+			logHandlerError(ctx, "day_change_wait_failed", "error", err)
 			return err
 		}
 
@@ -82,7 +81,7 @@ func (h StayHandler) Handle(ctx context.Context, booking domain.Booking) error {
 	}
 
 	if err := h.notifyCheckoutToday(ctx); err != nil {
-		slog.ErrorContext(ctx, "stay handler: notify checkout today", "error", err)
+		logHandlerError(ctx, "checkout_today_notification_failed", "error", err)
 		return err
 	}
 
@@ -105,7 +104,7 @@ func (h StayHandler) stayRoutine(ctx context.Context, booking domain.Booking) er
 	}
 
 	if err := h.cleanCottage(ctx, booking.CottageName); err != nil {
-		slog.ErrorContext(ctx, "stay handler: clean cottage", "error", err)
+		logHandlerError(ctx, "cleaning_request_failed", "cottage_name", booking.CottageName, "error", err)
 		return err
 	}
 
@@ -118,7 +117,7 @@ func (h StayHandler) stayRoutine(ctx context.Context, booking domain.Booking) er
 	}
 
 	if err := h.prepareCottageForSleep(ctx, booking.CottageName); err != nil {
-		slog.ErrorContext(ctx, "stay handler: prepare cottage for sleep", "error", err)
+		logHandlerError(ctx, "prepare_for_sleep_failed", "cottage_name", booking.CottageName, "error", err)
 		return err
 	}
 
@@ -139,7 +138,7 @@ func (h StayHandler) checkInDayRoutine(ctx context.Context, booking domain.Booki
 	}
 
 	if err := h.prepareCottageForSleep(ctx, booking.CottageName); err != nil {
-		slog.ErrorContext(ctx, "stay handler: prepare cottage for sleep", "error", err)
+		logHandlerError(ctx, "prepare_for_sleep_failed", "cottage_name", booking.CottageName, "error", err)
 		return err
 	}
 
@@ -172,7 +171,7 @@ func (h StayHandler) waitDayChangeEvent(ctx context.Context, events <-chan time.
 }
 
 func (h StayHandler) ignoreAction(ctx context.Context, action dto.GuestAction) error {
-	slog.InfoContext(ctx, "action does not trigger anything, just ack guest action", "action", action)
+	logHandlerInfo(ctx, "guest_action_acknowledged", "action", action.String())
 
 	return h.reader.AckGuestAction(ctx)
 }
@@ -180,11 +179,11 @@ func (h StayHandler) ignoreAction(ctx context.Context, action dto.GuestAction) e
 func (h StayHandler) cleanCottage(ctx context.Context, cottageName string) error {
 	msg, err := h.reader.WaitForGuestAction(ctx, dto.GuestAction_LEAVE_CLEANUP_NOTIFICATION)
 	if err != nil {
-		slog.WarnContext(ctx, "wait for LEAVE_CLEANUP_NOTIFICATION", "error", err)
+		logHandlerWarn(ctx, "leave_cleanup_notification_wait_failed", "error", err)
 		return err
 	}
 
-	slog.InfoContext(ctx, "received LEAVE_CLEANUP_NOTIFICATION", "message", msg)
+	logHandlerInfo(ctx, "guest_action_received", guestActionAttrs(msg)...)
 
 	cleaningRequest, err := domain.NewCleaningOrder(cottageName, enum.FullCleaning)
 	if err != nil {
@@ -194,6 +193,7 @@ func (h StayHandler) cleanCottage(ctx context.Context, cottageName string) error
 	if err := h.cleaningService.CleanRoom(ctx, cleaningRequest); err != nil {
 		return err
 	}
+	logHandlerInfo(ctx, "cleaning_requested", "cottage_name", cottageName, "request_type", string(enum.FullCleaning))
 
 	return nil
 }
@@ -201,11 +201,11 @@ func (h StayHandler) cleanCottage(ctx context.Context, cottageName string) error
 func (h StayHandler) prepareCottageForSleep(ctx context.Context, cottageName string) error {
 	msg, err := h.reader.WaitForGuestAction(ctx, dto.GuestAction_GO_FOR_DINNER)
 	if err != nil {
-		slog.WarnContext(ctx, "wait for GO_FOR_DINNER", "error", err)
+		logHandlerWarn(ctx, "go_for_dinner_wait_failed", "error", err)
 		return err
 	}
 
-	slog.InfoContext(ctx, "received GO_FOR_DINNER", "message", msg)
+	logHandlerInfo(ctx, "guest_action_received", guestActionAttrs(msg)...)
 
 	cleaningRequest, err := domain.NewCleaningOrder(cottageName, enum.PrepareForSleep)
 	if err != nil {
@@ -215,6 +215,7 @@ func (h StayHandler) prepareCottageForSleep(ctx context.Context, cottageName str
 	if err := h.cleaningService.CleanRoom(ctx, cleaningRequest); err != nil {
 		return err
 	}
+	logHandlerInfo(ctx, "cleaning_requested", "cottage_name", cottageName, "request_type", string(enum.PrepareForSleep))
 
 	return nil
 }
@@ -259,18 +260,6 @@ func (h StayHandler) notifyBreakfast(ctx context.Context) error {
 }
 
 func (h StayHandler) notifyCheckoutToday(ctx context.Context) error {
-	checkOutCh := make(chan []domain.Booking)
-	go h.notificationService.CheckOutNotification(ctx, checkOutCh)
-
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case checkOutBookings, ok := <-checkOutCh:
-		if !ok || len(checkOutBookings) == 0 {
-			return nil
-		}
-	}
-
 	if err := h.writer.SendSystemNotification(ctx, dto.SystemNotification_CHECK_OUT_TODAY); err != nil {
 		return fmt.Errorf("stay handler: send checkout notification: %w", err)
 	}

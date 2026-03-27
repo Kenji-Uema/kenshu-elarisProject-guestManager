@@ -56,7 +56,13 @@ func (m *chat) WriteOneMessage(ctx context.Context, msg *dto.ChatMessage) error 
 
 	b, err := protojson.Marshal(msg)
 	if err != nil {
-		slog.WarnContext(ctx, "websocket ack marshal", "error", err, "message_id", msg.GetMessageId())
+		slog.WarnContext(ctx, "lodging chat",
+			"component", "lodging_chat",
+			"layer", "transport",
+			"event", "message_marshal_failed",
+			"error", err,
+			"message_id", msg.GetMessageId(),
+		)
 		return err
 	}
 
@@ -69,6 +75,8 @@ func (m *chat) WriteOneMessage(ctx context.Context, msg *dto.ChatMessage) error 
 	if err := m.conn.WriteMessage(websocket.TextMessage, b); err != nil {
 		return err
 	}
+
+	slog.InfoContext(ctx, "lodging chat", outgoingMessageAttrs(msg)...)
 
 	return nil
 }
@@ -88,16 +96,28 @@ func (m *chat) ReadOneMessage(ctx context.Context) (*dto.ChatMessage, error) {
 
 	if err != nil {
 		if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-			slog.WarnContext(ctx, "websocket readOneMessage", "error", err)
+			slog.WarnContext(ctx, "lodging chat",
+				"component", "lodging_chat",
+				"layer", "transport",
+				"event", "message_read_failed",
+				"error", err,
+			)
 		}
 		return nil, err
 	}
 
 	var msg dto.ChatMessage
 	if err := protojson.Unmarshal(b, &msg); err != nil {
-		slog.WarnContext(ctx, "websocket unmarshal", "error", err)
+		slog.WarnContext(ctx, "lodging chat",
+			"component", "lodging_chat",
+			"layer", "transport",
+			"event", "message_unmarshal_failed",
+			"error", err,
+		)
 		return nil, err
 	}
+
+	slog.InfoContext(ctx, "lodging chat", incomingMessageAttrs(&msg)...)
 
 	return &msg, nil
 }
@@ -154,7 +174,13 @@ func (m *chat) SendAck(ctx context.Context, msg *dto.ChatMessage) {
 	}
 
 	if err := m.WriteOneMessage(ctx, ack); err != nil {
-		slog.WarnContext(ctx, "websocket ack writeOneMessage", "error", err, "message_id", msg.GetMessageId())
+		slog.WarnContext(ctx, "lodging chat",
+			"component", "lodging_chat",
+			"layer", "transport",
+			"event", "ack_send_failed",
+			"error", err,
+			"message_id", msg.GetMessageId(),
+		)
 	}
 }
 
@@ -165,4 +191,113 @@ func isReadTimeout(err error) bool {
 func isNetTimeout(err error) bool {
 	var netErr net.Error
 	return errors.As(err, &netErr) && netErr.Timeout()
+}
+
+func outgoingMessageAttrs(msg *dto.ChatMessage) []any {
+	attrs := []any{
+		"component", "lodging_chat",
+		"layer", "transport",
+		"event", "message_sent",
+		"direction", "outbound",
+		"message_id", msg.GetMessageId(),
+		"correlation_id", msg.GetCorrelationId(),
+		"sender", msg.GetSender().String(),
+		"protocol_version", msg.GetProtocolVersion(),
+	}
+
+	switch {
+	case msg.GetAck() != nil:
+		attrs = append(attrs,
+			"message_type", "ack",
+			"acknowledged_message_id", msg.GetAck().GetAcknowledgedMessageId(),
+			"ack_status", msg.GetAck().GetStatus().String(),
+			"ack_code", msg.GetAck().GetCode().String(),
+		)
+	case msg.GetSystemRequest() != dto.SystemRequest_SYSTEM_REQUEST_UNSPECIFIED:
+		attrs = append(attrs,
+			"message_type", "system_request",
+			"system_request", msg.GetSystemRequest().String(),
+		)
+	case msg.GetSystemNotification() != dto.SystemNotification_SYSTEM_NOTIFICATION_UNSPECIFIED:
+		attrs = append(attrs,
+			"message_type", "system_notification",
+			"system_notification", msg.GetSystemNotification().String(),
+		)
+	case msg.GetGuestAction() != dto.GuestAction_GUEST_ACTION_UNSPECIFIED:
+		attrs = append(attrs,
+			"message_type", "guest_action",
+			"guest_action", msg.GetGuestAction().String(),
+		)
+	case msg.GetGuestResponse() != nil:
+		attrs = append(attrs,
+			"message_type", "guest_response",
+			"guest_response_type", guestResponseType(msg.GetGuestResponse()),
+		)
+	default:
+		attrs = append(attrs, "message_type", "unknown")
+	}
+
+	return attrs
+}
+
+func incomingMessageAttrs(msg *dto.ChatMessage) []any {
+	attrs := []any{
+		"component", "lodging_chat",
+		"layer", "transport",
+		"event", "message_received",
+		"direction", "inbound",
+		"message_id", msg.GetMessageId(),
+		"correlation_id", msg.GetCorrelationId(),
+		"sender", msg.GetSender().String(),
+		"protocol_version", msg.GetProtocolVersion(),
+	}
+
+	switch {
+	case msg.GetAck() != nil:
+		attrs = append(attrs,
+			"message_type", "ack",
+			"acknowledged_message_id", msg.GetAck().GetAcknowledgedMessageId(),
+			"ack_status", msg.GetAck().GetStatus().String(),
+			"ack_code", msg.GetAck().GetCode().String(),
+		)
+	case msg.GetSystemRequest() != dto.SystemRequest_SYSTEM_REQUEST_UNSPECIFIED:
+		attrs = append(attrs,
+			"message_type", "system_request",
+			"system_request", msg.GetSystemRequest().String(),
+		)
+	case msg.GetSystemNotification() != dto.SystemNotification_SYSTEM_NOTIFICATION_UNSPECIFIED:
+		attrs = append(attrs,
+			"message_type", "system_notification",
+			"system_notification", msg.GetSystemNotification().String(),
+		)
+	case msg.GetGuestAction() != dto.GuestAction_GUEST_ACTION_UNSPECIFIED:
+		attrs = append(attrs,
+			"message_type", "guest_action",
+			"guest_action", msg.GetGuestAction().String(),
+		)
+	case msg.GetGuestResponse() != nil:
+		attrs = append(attrs,
+			"message_type", "guest_response",
+			"guest_response_type", guestResponseType(msg.GetGuestResponse()),
+		)
+	default:
+		attrs = append(attrs, "message_type", "unknown")
+	}
+
+	return attrs
+}
+
+func guestResponseType(response *dto.GuestResponse) string {
+	switch response.GetPayload().(type) {
+	case *dto.GuestResponse_ShowDocument:
+		return "show_document"
+	case *dto.GuestResponse_ShowBookingNumber:
+		return "show_booking_number"
+	case *dto.GuestResponse_ReceiveCottageKey:
+		return "receive_cottage_key"
+	case *dto.GuestResponse_ReturnCottageKey:
+		return "return_cottage_key"
+	default:
+		return "unknown"
+	}
 }

@@ -74,25 +74,7 @@ func (w *writer) SendSystemNotification(ctx context.Context, notification dto.Sy
 		},
 	}
 
-	for {
-		var err error
-		if err = w.chat.WriteOneMessage(ctx, message); err != nil {
-			return err
-		}
-
-		if err = w.waitForAck(ctx, message.GetMessageId()); err == nil {
-			return nil
-		}
-
-		var ackErr *chatErrors.AckNotReceivedErr
-		if errors.As(err, &ackErr) {
-			slog.DebugContext(ctx, "resending websocket system message after ack timeout",
-				"message_id", message.GetMessageId())
-			continue
-		}
-
-		return err
-	}
+	return w.chat.WriteOneMessage(ctx, message)
 }
 
 func (w *writer) waitForReply(ctx context.Context, correlationID string, responseType *dto.GuestResponse) (*dto.ChatMessage, error) {

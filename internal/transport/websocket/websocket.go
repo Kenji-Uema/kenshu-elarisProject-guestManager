@@ -77,22 +77,46 @@ func NewWebsocket(receptionService app.ReceptionService, cleaningService app.Cle
 // Handle upgrades HTTP requests to websocket and echoes messages back.
 func (s *Ws) Handle(c *gin.Context) {
 	if s.receptionService == nil || s.notificationService == nil || s.timeEventService == nil {
-		slog.ErrorContext(c.Request.Context(), "websocket dependencies not configured")
+		slog.ErrorContext(c.Request.Context(), "lodging chat",
+			"component", "lodging_chat",
+			"layer", "session",
+			"event", "dependencies_missing",
+		)
 		c.Status(http.StatusServiceUnavailable)
 		return
 	}
 
 	conn, err := s.upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
-		slog.WarnContext(c.Request.Context(), "upgrade websocket", "error", err)
+		slog.WarnContext(c.Request.Context(), "lodging chat",
+			"component", "lodging_chat",
+			"layer", "session",
+			"event", "upgrade_failed",
+			"error", err,
+		)
 		return
 	}
+	slog.InfoContext(c.Request.Context(), "lodging chat",
+		"component", "lodging_chat",
+		"layer", "session",
+		"event", "session_started",
+	)
 	defer func(conn *websocket.Conn) {
 		err := conn.Close()
 		if err != nil {
-			slog.WarnContext(c.Request.Context(), "close websocket", "error", err)
+			slog.WarnContext(c.Request.Context(), "lodging chat",
+				"component", "lodging_chat",
+				"layer", "session",
+				"event", "session_close_failed",
+				"error", err,
+			)
 		}
 	}(conn)
+	defer slog.InfoContext(c.Request.Context(), "lodging chat",
+		"component", "lodging_chat",
+		"layer", "session",
+		"event", "session_finished",
+	)
 
 	reader, writer := chat.NewChat(conn, defaultReplyTimeout, defaultAckTimeout)
 
@@ -102,19 +126,36 @@ func (s *Ws) Handle(c *gin.Context) {
 
 	booking, err := checkinHandler.Handle(c.Request.Context())
 	if err != nil {
-		slog.ErrorContext(c.Request.Context(), "checkin handler", "error", err)
+		slog.ErrorContext(c.Request.Context(), "lodging chat",
+			"component", "lodging_chat",
+			"layer", "session",
+			"event", "checkin_flow_failed",
+			"error", err,
+		)
 		return
 	}
 
 	err = stayHandler.Handle(c.Request.Context(), booking)
 	if err != nil {
-		slog.ErrorContext(c.Request.Context(), "stay handler", "error", err)
+		slog.ErrorContext(c.Request.Context(), "lodging chat",
+			"component", "lodging_chat",
+			"layer", "session",
+			"event", "stay_flow_failed",
+			"error", err,
+			"cottage_name", booking.CottageName,
+		)
 		return
 	}
 
 	err = checkoutHandler.Handle(c.Request.Context(), booking)
 	if err != nil {
-		slog.ErrorContext(c.Request.Context(), "checkout handler", "error", err)
+		slog.ErrorContext(c.Request.Context(), "lodging chat",
+			"component", "lodging_chat",
+			"layer", "session",
+			"event", "checkout_flow_failed",
+			"error", err,
+			"cottage_name", booking.CottageName,
+		)
 		return
 	}
 }

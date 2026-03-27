@@ -66,6 +66,9 @@ func TestWsHandle(t *testing.T) {
 		}
 
 		runWebsocketRequest(t, ws)
+		waitFor(t, func() bool {
+			return checkin.HandleCallCount == 1 && stay.HandleCallCount == 1 && checkout.HandleCallCount == 1
+		})
 
 		if checkin.HandleCallCount != 1 || stay.HandleCallCount != 1 || checkout.HandleCallCount != 1 {
 			t.Fatalf("Handle() call counts = checkin:%d stay:%d checkout:%d, want 1 each", checkin.HandleCallCount, stay.HandleCallCount, checkout.HandleCallCount)
@@ -88,6 +91,9 @@ func TestWsHandle(t *testing.T) {
 		}
 
 		runWebsocketRequest(t, ws)
+		waitFor(t, func() bool {
+			return checkin.HandleCallCount == 1
+		})
 
 		if checkin.HandleCallCount != 1 {
 			t.Fatalf("Handle() expected checkin to run once, got %d", checkin.HandleCallCount)
@@ -114,6 +120,9 @@ func TestWsHandle(t *testing.T) {
 		}
 
 		runWebsocketRequest(t, ws)
+		waitFor(t, func() bool {
+			return checkin.HandleCallCount == 1 && stay.HandleCallCount == 1
+		})
 
 		if checkin.HandleCallCount != 1 || stay.HandleCallCount != 1 {
 			t.Fatalf("Handle() expected checkin/stay to run once, got checkin:%d stay:%d", checkin.HandleCallCount, stay.HandleCallCount)
@@ -206,4 +215,16 @@ func testBooking(t *testing.T, cottage string) domain.Booking {
 	}
 
 	return booking
+}
+
+func waitFor(t *testing.T, condition func() bool) {
+	t.Helper()
+
+	deadline := time.Now().Add(500 * time.Millisecond)
+	for time.Now().Before(deadline) {
+		if condition() {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
 }

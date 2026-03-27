@@ -50,3 +50,27 @@ func NewLogger() *slog.Logger {
 		"app", hostname,
 	)
 }
+
+func GuestHTTPInfo(ctx context.Context, event string, attrs ...any) {
+	slog.InfoContext(ctx, "guest http", append([]any{
+		"component", "guest_http",
+		"layer", "handler",
+		"event", event,
+	}, attrs...)...)
+}
+
+func GuestHTTPWarn(ctx context.Context, event string, attrs ...any) {
+	slog.WarnContext(ctx, "guest http", append([]any{
+		"component", "guest_http",
+		"layer", "handler",
+		"event", event,
+	}, attrs...)...)
+}
+
+func GuestHTTPError(ctx context.Context, event string, attrs ...any) {
+	slog.ErrorContext(ctx, "guest http", append([]any{
+		"component", "guest_http",
+		"layer", "handler",
+		"event", event,
+	}, attrs...)...)
+}

@@ -113,7 +113,7 @@ func (s *guestService) GetBookings(ctx context.Context, guestId bson.ObjectID) (
 		return []domain.Booking{}, nil
 	}
 
-	bookings := make([]domain.Booking, len(bookingsDoc))
+	bookings := make([]domain.Booking, 0, len(bookingsDoc))
 	for _, b := range bookingsDoc {
 		stayPeriod, err := domain.NewPeriod(b.StayPeriod.CheckIn, b.StayPeriod.CheckOut)
 		if err != nil {

@@ -16,9 +16,6 @@ func TestWriterSendSystemNotification(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		fakeChat := &fakes.Chat{}
-		fakeChat.OnWrite = func(msg *dto.ChatMessage) {
-			fakeChat.Messages = append(fakeChat.Messages, ackForTestMessage(msg))
-		}
 
 		writer := &writer{chat: fakeChat}
 		err := writer.SendSystemNotification(context.Background(), dto.SystemNotification_BREAKFAST_READY)
@@ -34,94 +31,33 @@ func TestWriterSendSystemNotification(t *testing.T) {
 		}
 	})
 
-	t.Run("returns context deadline exceeded when no ack arrives before context expires", func(t *testing.T) {
-		fakeChat := &fakes.Chat{WaitForContextDone: true}
+	t.Run("returns context error before write when context is canceled", func(t *testing.T) {
+		fakeChat := &fakes.Chat{}
 		writer := &writer{chat: fakeChat}
-		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
-		defer cancel()
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
 
 		err := writer.SendSystemNotification(ctx, dto.SystemNotification_BREAKFAST_READY)
 		if err == nil {
-			t.Fatal("SendSystemNotification() expected timeout error, got nil")
+			t.Fatal("SendSystemNotification() expected context error, got nil")
 		}
 
-		if !errors.Is(err, context.DeadlineExceeded) {
-			t.Fatalf("SendSystemNotification() expected context deadline exceeded, got %v", err)
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("SendSystemNotification() expected context canceled, got %v", err)
 		}
 	})
 
-	t.Run("resends after ack timeout", func(t *testing.T) {
-		ackReadCount := 0
-		fakeChat := &fakes.Chat{}
-		fakeChat.OnReadAck = func(ctx context.Context) (*dto.ChatMessage, error) {
-			ackReadCount++
-			if ackReadCount == 1 {
-				return nil, &chatErrors.AckNotReceivedErr{Err: context.DeadlineExceeded}
-			}
-			return fakeChat.ReadOneMessage(ctx)
-		}
-		fakeChat.OnWrite = func(msg *dto.ChatMessage) {
-			if len(fakeChat.Written) == 1 {
-				return
-			}
-			fakeChat.Messages = append(fakeChat.Messages, ackForTestMessage(msg))
-		}
-
-		writer := &writer{chat: fakeChat}
-		err := writer.SendSystemNotification(context.Background(), dto.SystemNotification_BREAKFAST_READY)
-		if err != nil {
-			t.Fatalf("SendSystemNotification() unexpected error: %v", err)
-		}
-
-		if len(fakeChat.Written) != 2 {
-			t.Fatalf("SendSystemNotification() expected 2 writes, got %d", len(fakeChat.Written))
-		}
-		if fakeChat.Written[0].GetMessageId() != fakeChat.Written[1].GetMessageId() {
-			t.Fatalf("SendSystemNotification() expected resend with same message id, got %q and %q", fakeChat.Written[0].GetMessageId(), fakeChat.Written[1].GetMessageId())
-		}
-	})
-
-	t.Run("ignores unrelated ack while waiting for target ack", func(t *testing.T) {
-		fakeChat := &fakes.Chat{}
-		fakeChat.OnWrite = func(msg *dto.ChatMessage) {
-			fakeChat.Messages = append(fakeChat.Messages, &dto.ChatMessage{
-				MessageId:     "ack-other-message",
-				CorrelationId: "other-message-id",
-				Payload: &dto.ChatMessage_Ack{
-					Ack: &dto.Ack{
-						AcknowledgedMessageId: "other-message-id",
-						Status:                dto.AckStatus_ACK_STATUS_ACCEPTED,
-						Code:                  dto.ErrorCode_ERROR_CODE_NONE,
-					},
-				},
-			}, ackForTestMessage(msg))
-		}
-
-		writer := &writer{chat: fakeChat}
-		err := writer.SendSystemNotification(context.Background(), dto.SystemNotification_BREAKFAST_READY)
-		if err != nil {
-			t.Fatalf("SendSystemNotification() unexpected error: %v", err)
-		}
-
-		if len(fakeChat.Written) != 1 {
-			t.Fatalf("SendSystemNotification() expected 1 write, got %d", len(fakeChat.Written))
-		}
-	})
-
-	t.Run("returns read ack error when it is not an ack timeout", func(t *testing.T) {
-		readErr := errors.New("read ack failed")
-		fakeChat := &fakes.Chat{ReadErr: readErr}
+	t.Run("returns write error", func(t *testing.T) {
+		writeErr := errors.New("write failed")
+		fakeChat := &fakes.Chat{WriteErr: writeErr}
 		writer := &writer{chat: fakeChat}
 
 		err := writer.SendSystemNotification(context.Background(), dto.SystemNotification_BREAKFAST_READY)
 		if err == nil {
 			t.Fatal("SendSystemNotification() expected error, got nil")
 		}
-		if !errors.Is(err, readErr) {
-			t.Fatalf("SendSystemNotification() expected read error, got %v", err)
-		}
-		if len(fakeChat.Written) != 1 {
-			t.Fatalf("SendSystemNotification() expected 1 write, got %d", len(fakeChat.Written))
+		if !errors.Is(err, writeErr) {
+			t.Fatalf("SendSystemNotification() expected write error, got %v", err)
 		}
 	})
 }

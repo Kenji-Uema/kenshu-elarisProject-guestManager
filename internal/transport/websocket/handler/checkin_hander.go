@@ -3,7 +3,6 @@ package handler
 import (
 	"context"
 	"errors"
-	"log/slog"
 
 	"github.com/Kenji-Uema/guestManager/internal/app"
 	"github.com/Kenji-Uema/guestManager/internal/domain"
@@ -38,61 +37,62 @@ func (h CheckinHandler) Handle(ctx context.Context) (domain.Booking, error) {
 
 	now, err := h.clock.Now(ctx)
 	if err != nil {
-		slog.ErrorContext(ctx, "checkin handler: clock emu now", "error", err)
+		logHandlerError(ctx, "clock_read_failed", "error", err)
 		return domain.Booking{}, err
 	}
 
 	var documentID string
 	if documentID, err = h.requestDocumentID(ctx); err != nil {
-		slog.ErrorContext(ctx, "checkin handler: request document", "error", err)
+		logHandlerError(ctx, "document_request_failed", "error", err)
 		return domain.Booking{}, err
 	}
 
-	slog.InfoContext(ctx, "checkin handler: received document id", "document_id", documentID)
+	logHandlerInfo(ctx, "document_id_received", "document_id", documentID)
 
 	if err := h.writer.SendSystemNotification(ctx, dto.SystemNotification_BOOKING_CHECKING); err != nil {
-		slog.ErrorContext(ctx, "checkin handler: send notification", "error", err)
+		logHandlerError(ctx, "booking_checking_notification_failed", "error", err)
 		return domain.Booking{}, err
 	}
 
 	booking, err := h.receptionService.CheckIn(ctx, documentID, *now)
 	if err != nil {
-		slog.ErrorContext(ctx, "default checkin failed, trying fallback checkin", "error", err)
+		logHandlerWarn(ctx, "checkin_fallback_started", "document_id", documentID, "error", err)
 
 		var bookingID string
 		if bookingID, err = h.requestBookingID(ctx); err != nil {
-			slog.ErrorContext(ctx, "checkin handler: request booking id", "error", err)
+			logHandlerError(ctx, "booking_id_request_failed", "document_id", documentID, "error", err)
 			return domain.Booking{}, err
 		}
-		slog.InfoContext(ctx, "checkin handler: received booking id", "booking_id", bookingID)
+		logHandlerInfo(ctx, "booking_id_received", "booking_id", bookingID)
 
 		if booking, err = h.receptionService.CheckinFallback(ctx, documentID, bookingID, *now); err != nil {
-			slog.ErrorContext(ctx, "checkin handler: checkin fallback", "error", err)
+			logHandlerError(ctx, "checkin_fallback_failed", "document_id", documentID, "booking_id", bookingID, "error", err)
 			return domain.Booking{}, err
 		}
-		slog.InfoContext(ctx, "checkin handler: fallback checkin succeeded")
+		logHandlerInfo(ctx, "checkin_fallback_succeeded", "document_id", documentID, "booking_id", bookingID, "cottage_name", booking.CottageName)
 	}
 
-	slog.InfoContext(ctx, "checkin handler: checkin succeeded")
+	logHandlerInfo(ctx, "checkin_succeeded", "document_id", documentID, "cottage_name", booking.CottageName)
 
 	if err := h.writer.SendSystemNotification(ctx, dto.SystemNotification_CHECK_IN_COMPLETE); err != nil {
-		slog.ErrorContext(ctx, "checkin handler: send notification", "error", err)
+		logHandlerError(ctx, "checkin_complete_notification_failed", "cottage_name", booking.CottageName, "error", err)
 		return domain.Booking{}, err
 	}
 
 	keyNumber, err := h.giveCottageKey(ctx)
 	if err != nil {
-		slog.ErrorContext(ctx, "checkin handler: give cottage key", "error", err)
+		logHandlerError(ctx, "cottage_key_request_failed", "cottage_name", booking.CottageName, "error", err)
 		return domain.Booking{}, err
 	}
 	if _, err := h.reader.WaitForGuestAction(ctx, dto.GuestAction_TAKE_COTTAGE_KEY); err != nil {
-		slog.ErrorContext(ctx, "checkin handler: wait for take cottage key", "error", err)
+		logHandlerError(ctx, "take_cottage_key_wait_failed", "cottage_name", booking.CottageName, "error", err)
 		return domain.Booking{}, err
 	}
 	if err := h.receptionService.ReceiveCottageKey(ctx, booking.CottageName, keyNumber); err != nil {
-		slog.ErrorContext(ctx, "checkin handler: receive cottage key", "error", err)
+		logHandlerError(ctx, "cottage_key_receive_failed", "cottage_name", booking.CottageName, "key_number", keyNumber, "error", err)
 		return domain.Booking{}, err
 	}
+	logHandlerInfo(ctx, "cottage_key_received", "cottage_name", booking.CottageName, "key_number", keyNumber)
 
 	return booking, nil
 }
@@ -100,11 +100,11 @@ func (h CheckinHandler) Handle(ctx context.Context) (domain.Booking, error) {
 func (h CheckinHandler) waitForGuest(ctx context.Context) error {
 	msg, err := h.reader.WaitForGuestAction(ctx, dto.GuestAction_SHOW_FOR_CHECKIN)
 	if err != nil {
-		slog.WarnContext(ctx, "wait for SHOW_FOR_CHECKIN", "error", err)
+		logHandlerWarn(ctx, "show_for_checkin_wait_failed", "error", err)
 		return err
 	}
 
-	slog.InfoContext(ctx, "received SHOW_FOR_CHECKIN", "message", msg)
+	logHandlerInfo(ctx, "guest_action_received", guestActionAttrs(msg)...)
 
 	return nil
 }

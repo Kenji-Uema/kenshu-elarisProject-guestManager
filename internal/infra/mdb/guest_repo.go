@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/Kenji-Uema/guestManager/internal/app/validation"
 	"github.com/Kenji-Uema/guestManager/internal/domain/documents"
@@ -98,6 +99,8 @@ func (g *guestRepo) Update(ctx context.Context, id bson.ObjectID, updatedGuest d
 	setStringIfChanged(updateFields, "surname", &existingGuest.Surname, updatedGuest.Surname)
 	setStringIfChanged(updateFields, "email", &existingGuest.Email, updatedGuest.Email)
 	setStringIfChanged(updateFields, "billing_address", &existingGuest.BillingAddress, updatedGuest.BillingAddress)
+	setTimePointerIfChanged(updateFields, "created_at", &existingGuest.CreatedAt, updatedGuest.CreatedAt)
+	setTimePointerIfChanged(updateFields, "last_update", &existingGuest.LastUpdate, updatedGuest.LastUpdate)
 
 	if len(updateFields) == 0 {
 		return existingGuest, nil
@@ -108,11 +111,22 @@ func (g *guestRepo) Update(ctx context.Context, id bson.ObjectID, updatedGuest d
 			dbErrors.ErrGuestRepo, id.Hex(), err)
 	}
 
-	return existingGuest, nil
+	return updatedGuest, nil
 }
 
 func setStringIfChanged(m bson.M, key string, current *string, newVal string) {
 	if newVal != "" && newVal != *current {
+		m[key] = newVal
+		*current = newVal
+	}
+}
+
+func setTimePointerIfChanged(m bson.M, key string, current **time.Time, newVal *time.Time) {
+	switch {
+	case newVal == nil && *current != nil:
+		m[key] = nil
+		*current = nil
+	case newVal != nil && (*current == nil || !newVal.Equal(**current)):
 		m[key] = newVal
 		*current = newVal
 	}
