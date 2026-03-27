@@ -1,5 +1,5 @@
 build: generate
-	go build .
+	go build ./internal
 
 generate:
 	npx buf generate
