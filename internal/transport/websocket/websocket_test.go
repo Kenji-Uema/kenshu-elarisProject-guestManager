@@ -160,7 +160,7 @@ func stubHandlerFactories(checkin *handlerfakes.CheckinHandler, stay *handlerfak
 		return checkin
 	}
 	newStayHandler = func(notificationService app.NotificationService, cleaningService app.CleaningService,
-		timeEventService app.TimeEventService, writer chat.Writer, reader chat.Reader) stayHandler {
+		timeEventService app.TimeEventService, clock port.ClockClient, writer chat.Writer, reader chat.Reader) stayHandler {
 		return stay
 	}
 	newCheckoutHandler = func(receptionService app.ReceptionService, clock port.ClockClient,

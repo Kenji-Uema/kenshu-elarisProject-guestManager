@@ -50,6 +50,46 @@ func TestReaderWaitForGuestAction(t *testing.T) {
 		}
 	})
 
+	t.Run("buffers unmatched guest actions for later waits", func(t *testing.T) {
+		fakeChat := &fakes.Chat{
+			Messages: []*dto.ChatMessage{
+				{
+					MessageId: "guest-checkout",
+					Payload: &dto.ChatMessage_GuestAction{
+						GuestAction: dto.GuestAction_PROCEED_TO_CHECKOUT,
+					},
+				},
+				{
+					MessageId: "guest-leave",
+					Payload: &dto.ChatMessage_GuestAction{
+						GuestAction: dto.GuestAction_LEAVE_COTTAGE,
+					},
+				},
+			},
+		}
+
+		reader := &reader{chat: fakeChat}
+		msg, err := reader.WaitForGuestAction(context.Background(), dto.GuestAction_LEAVE_COTTAGE)
+		if err != nil {
+			t.Fatalf("WaitForGuestAction() unexpected error: %v", err)
+		}
+		if msg.GetMessageId() != "guest-leave" {
+			t.Fatalf("WaitForGuestAction() unexpected first message: %+v", msg)
+		}
+
+		msg, err = reader.WaitForGuestAction(context.Background(), dto.GuestAction_PROCEED_TO_CHECKOUT)
+		if err != nil {
+			t.Fatalf("WaitForGuestAction() unexpected error on buffered action: %v", err)
+		}
+		if msg.GetMessageId() != "guest-checkout" {
+			t.Fatalf("WaitForGuestAction() unexpected buffered message: %+v", msg)
+		}
+
+		if len(fakeChat.Acked) != 2 {
+			t.Fatalf("WaitForGuestAction() expected 2 acked messages, got %d", len(fakeChat.Acked))
+		}
+	})
+
 	t.Run("returns immediate match", func(t *testing.T) {
 		fakeChat := &fakes.Chat{
 			Messages: []*dto.ChatMessage{

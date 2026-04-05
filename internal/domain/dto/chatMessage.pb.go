@@ -187,6 +187,8 @@ type ChatMessage struct {
 	Sender Sender `protobuf:"varint,4,opt,name=sender,proto3,enum=lodging.v1.Sender" json:"sender,omitempty"`
 	// Protocol contract version (for example: "lodging.v1").
 	ProtocolVersion string `protobuf:"bytes,12,opt,name=protocol_version,json=protocolVersion,proto3" json:"protocol_version,omitempty"`
+	// Per-message trace propagation payload.
+	TraceContext map[string]string `protobuf:"bytes,13,rep,name=trace_context,json=traceContext,proto3" json:"trace_context,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// Exactly one payload variant per envelope.
 	//
 	// Types that are valid to be assigned to Payload:
@@ -257,6 +259,13 @@ func (x *ChatMessage) GetProtocolVersion() string {
 		return x.ProtocolVersion
 	}
 	return ""
+}
+
+func (x *ChatMessage) GetTraceContext() map[string]string {
+	if x != nil {
+		return x.TraceContext
+	}
+	return nil
 }
 
 func (x *ChatMessage) GetPayload() isChatMessage_Payload {
@@ -419,19 +428,23 @@ var File_lodging_chatMessage_proto protoreflect.FileDescriptor
 const file_lodging_chatMessage_proto_rawDesc = "" +
 	"\n" +
 	"\x19lodging/chatMessage.proto\x12\n" +
-	"lodging.v1\x1a\x13lodging/guest.proto\x1a\x14lodging/system.proto\"\xf3\x03\n" +
+	"lodging.v1\x1a\x13lodging/guest.proto\x1a\x14lodging/system.proto\"\x84\x05\n" +
 	"\vChatMessage\x12\x1d\n" +
 	"\n" +
 	"message_id\x18\x01 \x01(\tR\tmessageId\x12%\n" +
 	"\x0ecorrelation_id\x18\x02 \x01(\tR\rcorrelationId\x12*\n" +
 	"\x06sender\x18\x04 \x01(\x0e2\x12.lodging.v1.SenderR\x06sender\x12)\n" +
-	"\x10protocol_version\x18\f \x01(\tR\x0fprotocolVersion\x12<\n" +
+	"\x10protocol_version\x18\f \x01(\tR\x0fprotocolVersion\x12N\n" +
+	"\rtrace_context\x18\r \x03(\v2).lodging.v1.ChatMessage.TraceContextEntryR\ftraceContext\x12<\n" +
 	"\fguest_action\x18\x06 \x01(\x0e2\x17.lodging.v1.GuestActionH\x00R\vguestAction\x12B\n" +
 	"\x0eguest_response\x18\a \x01(\v2\x19.lodging.v1.GuestResponseH\x00R\rguestResponse\x12Q\n" +
 	"\x13system_notification\x18\b \x01(\x0e2\x1e.lodging.v1.SystemNotificationH\x00R\x12systemNotification\x12B\n" +
 	"\x0esystem_request\x18\t \x01(\x0e2\x19.lodging.v1.SystemRequestH\x00R\rsystemRequest\x12#\n" +
 	"\x03ack\x18\n" +
-	" \x01(\v2\x0f.lodging.v1.AckH\x00R\x03ackB\t\n" +
+	" \x01(\v2\x0f.lodging.v1.AckH\x00R\x03ack\x1a?\n" +
+	"\x11TraceContextEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\t\n" +
 	"\apayload\"\x97\x01\n" +
 	"\x03Ack\x126\n" +
 	"\x17acknowledged_message_id\x18\x01 \x01(\tR\x15acknowledgedMessageId\x12-\n" +
@@ -462,32 +475,34 @@ func file_lodging_chatMessage_proto_rawDescGZIP() []byte {
 }
 
 var file_lodging_chatMessage_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_lodging_chatMessage_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_lodging_chatMessage_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_lodging_chatMessage_proto_goTypes = []any{
 	(Sender)(0),             // 0: lodging.v1.Sender
 	(AckStatus)(0),          // 1: lodging.v1.AckStatus
 	(ErrorCode)(0),          // 2: lodging.v1.ErrorCode
 	(*ChatMessage)(nil),     // 3: lodging.v1.ChatMessage
 	(*Ack)(nil),             // 4: lodging.v1.Ack
-	(GuestAction)(0),        // 5: lodging.v1.GuestAction
-	(*GuestResponse)(nil),   // 6: lodging.v1.GuestResponse
-	(SystemNotification)(0), // 7: lodging.v1.SystemNotification
-	(SystemRequest)(0),      // 8: lodging.v1.SystemRequest
+	nil,                     // 5: lodging.v1.ChatMessage.TraceContextEntry
+	(GuestAction)(0),        // 6: lodging.v1.GuestAction
+	(*GuestResponse)(nil),   // 7: lodging.v1.GuestResponse
+	(SystemNotification)(0), // 8: lodging.v1.SystemNotification
+	(SystemRequest)(0),      // 9: lodging.v1.SystemRequest
 }
 var file_lodging_chatMessage_proto_depIdxs = []int32{
 	0, // 0: lodging.v1.ChatMessage.sender:type_name -> lodging.v1.Sender
-	5, // 1: lodging.v1.ChatMessage.guest_action:type_name -> lodging.v1.GuestAction
-	6, // 2: lodging.v1.ChatMessage.guest_response:type_name -> lodging.v1.GuestResponse
-	7, // 3: lodging.v1.ChatMessage.system_notification:type_name -> lodging.v1.SystemNotification
-	8, // 4: lodging.v1.ChatMessage.system_request:type_name -> lodging.v1.SystemRequest
-	4, // 5: lodging.v1.ChatMessage.ack:type_name -> lodging.v1.Ack
-	1, // 6: lodging.v1.Ack.status:type_name -> lodging.v1.AckStatus
-	2, // 7: lodging.v1.Ack.code:type_name -> lodging.v1.ErrorCode
-	8, // [8:8] is the sub-list for method output_type
-	8, // [8:8] is the sub-list for method input_type
-	8, // [8:8] is the sub-list for extension type_name
-	8, // [8:8] is the sub-list for extension extendee
-	0, // [0:8] is the sub-list for field type_name
+	5, // 1: lodging.v1.ChatMessage.trace_context:type_name -> lodging.v1.ChatMessage.TraceContextEntry
+	6, // 2: lodging.v1.ChatMessage.guest_action:type_name -> lodging.v1.GuestAction
+	7, // 3: lodging.v1.ChatMessage.guest_response:type_name -> lodging.v1.GuestResponse
+	8, // 4: lodging.v1.ChatMessage.system_notification:type_name -> lodging.v1.SystemNotification
+	9, // 5: lodging.v1.ChatMessage.system_request:type_name -> lodging.v1.SystemRequest
+	4, // 6: lodging.v1.ChatMessage.ack:type_name -> lodging.v1.Ack
+	1, // 7: lodging.v1.Ack.status:type_name -> lodging.v1.AckStatus
+	2, // 8: lodging.v1.Ack.code:type_name -> lodging.v1.ErrorCode
+	9, // [9:9] is the sub-list for method output_type
+	9, // [9:9] is the sub-list for method input_type
+	9, // [9:9] is the sub-list for extension type_name
+	9, // [9:9] is the sub-list for extension extendee
+	0, // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_lodging_chatMessage_proto_init() }
@@ -510,7 +525,7 @@ func file_lodging_chatMessage_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lodging_chatMessage_proto_rawDesc), len(file_lodging_chatMessage_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   2,
+			NumMessages:   3,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

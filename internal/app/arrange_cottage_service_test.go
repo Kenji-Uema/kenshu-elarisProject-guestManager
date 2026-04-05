@@ -8,7 +8,9 @@ import (
 	"github.com/Kenji-Uema/guestManager/internal/app"
 	"github.com/Kenji-Uema/guestManager/internal/app/fakes"
 	"github.com/Kenji-Uema/guestManager/internal/domain/documents"
+	"github.com/Kenji-Uema/guestManager/internal/domain/dto"
 	mdbfakes "github.com/Kenji-Uema/guestManager/internal/infra/mdb/fakes"
+	mqfakes "github.com/Kenji-Uema/guestManager/internal/infra/mq/fakes"
 	portfakes "github.com/Kenji-Uema/guestManager/internal/port/fakes"
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
@@ -17,7 +19,7 @@ func TestArrangeCheckinConsumesDayChangeEvent(t *testing.T) {
 	cachedKeys := make(chan string, 2)
 	registered := make(chan struct{})
 	timeEvents := &fakes.TimeEventService{
-		RegisterFn: func(eventType app.TimeEventType, ch chan<- time.Time) {
+		RegisterFn: func(eventType app.TimeEventType, ch chan time.Time) {
 			close(registered)
 		},
 	}
@@ -42,12 +44,13 @@ func TestArrangeCheckinConsumesDayChangeEvent(t *testing.T) {
 		},
 	}
 	cache := &portfakes.FakeCache{}
+	guestPublisher := &mqfakes.FakeMqProducer{}
 	cache.SetBytesFn = func(ctx context.Context, key string, value []byte, expiration time.Duration) error {
 		cachedKeys <- key
 		return nil
 	}
 
-	service, err := app.NewArrangeCottageService(bookingRepo, timeEvents, cache)
+	service, err := app.NewArrangeCottageService(bookingRepo, timeEvents, cache, guestPublisher)
 	if err != nil {
 		t.Fatalf("NewArrangeCottageService() error = %v", err)
 	}
@@ -96,6 +99,16 @@ func TestArrangeCheckinConsumesDayChangeEvent(t *testing.T) {
 	}
 	if gotKeys[1] != "checkout.2026-03-27" {
 		t.Fatalf("second cache key = %q, want %q", gotKeys[1], "checkout.2026-03-27")
+	}
+	if guestPublisher.PublishCallCount != 1 {
+		t.Fatalf("Publish() calls = %d, want 1", guestPublisher.PublishCallCount)
+	}
+	msg, ok := guestPublisher.LastPublishedMessage.(*dto.CheckInTomorrowNotification)
+	if !ok {
+		t.Fatalf("published message type = %T", guestPublisher.LastPublishedMessage)
+	}
+	if msg.GetCottageName() != "Cottage 1" {
+		t.Fatalf("cottage name = %q, want %q", msg.GetCottageName(), "Cottage 1")
 	}
 
 	cancel()

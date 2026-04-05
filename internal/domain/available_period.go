@@ -18,7 +18,8 @@ func NewPeriod(start, end time.Time) (Period, error) {
 
 	return Period{
 		startOfDay(start),
-		startOfDay(end.AddDate(0, 0, 1)).Add(-time.Nanosecond)}, nil
+		startOfDay(end),
+	}, nil
 }
 
 func startOfDay(t time.Time) time.Time {

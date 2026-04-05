@@ -11,6 +11,7 @@ import (
 	"github.com/Kenji-Uema/guestManager/internal/domain"
 	"github.com/Kenji-Uema/guestManager/internal/domain/dto"
 	"github.com/Kenji-Uema/guestManager/internal/domain/enum"
+	infrafakes "github.com/Kenji-Uema/guestManager/internal/infra/clock/fakes"
 	mqfakes "github.com/Kenji-Uema/guestManager/internal/infra/mq/fakes"
 	chatfakes "github.com/Kenji-Uema/guestManager/internal/transport/websocket/chat/fakes"
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -39,20 +40,15 @@ func TestStayHandlerHandle(t *testing.T) {
 		timeEvents, dayDeliveries, stopTimeEvents := newTestTimeEventService(t)
 		defer stopTimeEvents()
 
-		handler := NewStayHandler(fakeNotifications, fakeCleaning, timeEvents, fakeWriter, fakeReader)
+		handler := NewStayHandler(fakeNotifications, fakeCleaning, timeEvents, nil, fakeWriter, fakeReader)
 
-		waitedActions := make([]dto.GuestAction, 0, 3)
-		ackedActions := 0
+		waitedActions := make([]dto.GuestAction, 0, 9)
 		notifications := make([]dto.SystemNotification, 0, 3)
 		secondDayEventSent := false
 
-		fakeReader.AckGuestActionFn = func(ctx context.Context) error {
-			ackedActions++
-			return nil
-		}
 		fakeReader.WaitForGuestActionFn = func(ctx context.Context, action dto.GuestAction) (*dto.ChatMessage, error) {
 			waitedActions = append(waitedActions, action)
-			if action == dto.GuestAction_GO_FOR_DINNER && len(waitedActions) == 3 && !secondDayEventSent {
+			if action == dto.GuestAction_GO_FOR_DINNER && len(waitedActions) == 10 && !secondDayEventSent {
 				secondDayEventSent = true
 				dayDeliveries <- amqp.Delivery{
 					Acknowledger: &mqfakes.FakeAcknowledger{},
@@ -75,32 +71,19 @@ func TestStayHandlerHandle(t *testing.T) {
 			return nil
 		}
 
-		breakfastCh := make(chan interface{}, 1)
-		dinnerCh := make(chan interface{}, 1)
-		checkoutCh := make(chan []domain.Booking, 1)
 		fakeNotifications.HourNotificationFn = func(ctx context.Context, timerCh chan interface{}, hour int) {
 			switch hour {
-			case 6:
-				timerCh <- <-breakfastCh
-			case 18:
-				timerCh <- <-dinnerCh
+			case 6, 18:
+				timerCh <- struct{}{}
 			default:
 				t.Fatalf("HourNotification() unexpected hour: %d", hour)
 			}
 		}
-		fakeNotifications.CheckOutNotificationFn = func(ctx context.Context, bookingCh chan []domain.Booking) {
-			bookingCh <- <-checkoutCh
-		}
-
-		breakfastCh <- struct{}{}
-		dinnerCh <- struct{}{}
 		dayDeliveries <- amqp.Delivery{
 			Acknowledger: &mqfakes.FakeAcknowledger{},
 			DeliveryTag:  1,
 			Body:         mustMarshalTimeEventStay(t, time.Date(2026, 3, 23, 0, 0, 0, 0, time.UTC)),
 		}
-		checkoutCh <- []domain.Booking{booking}
-
 		ctx, cancel := context.WithCancel(context.Background())
 		err = handler.Handle(ctx, booking)
 		cancel()
@@ -109,9 +92,19 @@ func TestStayHandlerHandle(t *testing.T) {
 		}
 
 		wantWaitedActions := []dto.GuestAction{
+			dto.GuestAction_ENTER_COTTAGE,
+			dto.GuestAction_GO_FOR_A_BATH,
 			dto.GuestAction_GO_FOR_DINNER,
+			dto.GuestAction_GO_TO_SLEEP,
+			dto.GuestAction_WAKEUP,
+			dto.GuestAction_GO_FOR_BREAKFAST,
 			dto.GuestAction_LEAVE_CLEANUP_NOTIFICATION,
+			dto.GuestAction_ENJOY_RESORT,
+			dto.GuestAction_GO_FOR_A_BATH,
 			dto.GuestAction_GO_FOR_DINNER,
+			dto.GuestAction_GO_TO_SLEEP,
+			dto.GuestAction_WAKEUP,
+			dto.GuestAction_LEAVE_COTTAGE,
 		}
 		if len(waitedActions) != len(wantWaitedActions) {
 			t.Fatalf("Handle() waited actions len = %d, want %d (%+v)", len(waitedActions), len(wantWaitedActions), waitedActions)
@@ -120,9 +113,6 @@ func TestStayHandlerHandle(t *testing.T) {
 			if waitedActions[i] != wantWaitedActions[i] {
 				t.Fatalf("Handle() waited action[%d] = %v, want %v", i, waitedActions[i], wantWaitedActions[i])
 			}
-		}
-		if ackedActions != 9 {
-			t.Fatalf("Handle() acked actions = %d, want 9", ackedActions)
 		}
 		if fakeCleaning.CleanRoomCallCount != 3 {
 			t.Fatalf("Handle() cleaning calls = %d, want 3", fakeCleaning.CleanRoomCallCount)
@@ -141,9 +131,8 @@ func TestStayHandlerHandle(t *testing.T) {
 		timeEvents, _, stopTimeEvents := newTestTimeEventService(t)
 		defer stopTimeEvents()
 
-		handler := NewStayHandler(fakeNotifications, fakeCleaning, timeEvents, fakeWriter, fakeReader)
+		handler := NewStayHandler(fakeNotifications, fakeCleaning, timeEvents, nil, fakeWriter, fakeReader)
 
-		fakeReader.AckGuestActionFn = func(ctx context.Context) error { return nil }
 		ctx, cancel := context.WithCancel(context.Background())
 		fakeReader.WaitForGuestActionFn = func(ctx context.Context, action dto.GuestAction) (*dto.ChatMessage, error) {
 			if action == dto.GuestAction_GO_FOR_DINNER {
@@ -154,17 +143,144 @@ func TestStayHandlerHandle(t *testing.T) {
 			}, nil
 		}
 		fakeNotifications.HourNotificationFn = func(ctx context.Context, timerCh chan interface{}, hour int) {
-			<-ctx.Done()
+			select {
+			case timerCh <- struct{}{}:
+			case <-ctx.Done():
+			}
 		}
-		fakeNotifications.CheckOutNotificationFn = func(ctx context.Context, bookingCh chan []domain.Booking) {
-			<-ctx.Done()
-		}
-
 		err := handler.Handle(ctx, booking)
 		if !errors.Is(err, context.Canceled) {
 			t.Fatalf("Handle() error = %v, want %v", err, context.Canceled)
 		}
 	})
+
+	t.Run("skips stay routine when first day change is already checkout day", func(t *testing.T) {
+		booking := mustBooking(t, "cottage-10")
+		stayPeriod, err := domain.NewPeriod(
+			time.Date(2026, 3, 22, 15, 0, 0, 0, time.UTC),
+			time.Date(2026, 3, 24, 11, 0, 0, 0, time.UTC),
+		)
+		if err != nil {
+			t.Fatalf("NewPeriod() error = %v", err)
+		}
+		booking.StayPeriod = stayPeriod
+
+		fakeCleaning := &appfakes.CleaningService{}
+		fakeWriter := &chatfakes.Writer{}
+		fakeReader := &chatfakes.Reader{}
+		fakeNotifications := &fakeNotificationService{}
+		timeEvents, dayDeliveries, stopTimeEvents := newTestTimeEventService(t)
+		defer stopTimeEvents()
+
+		handler := NewStayHandler(fakeNotifications, fakeCleaning, timeEvents, nil, fakeWriter, fakeReader)
+
+		waitedActions := make([]dto.GuestAction, 0, 5)
+		notifications := make([]dto.SystemNotification, 0, 2)
+
+		fakeReader.WaitForGuestActionFn = func(ctx context.Context, action dto.GuestAction) (*dto.ChatMessage, error) {
+			waitedActions = append(waitedActions, action)
+			return &dto.ChatMessage{
+				MessageId: "guest-action",
+				Payload: &dto.ChatMessage_GuestAction{
+					GuestAction: action,
+				},
+			}, nil
+		}
+		fakeWriter.SendSystemNotificationFn = func(ctx context.Context, notification dto.SystemNotification) error {
+			notifications = append(notifications, notification)
+			return nil
+		}
+		fakeCleaning.CleanRoomFn = func(ctx context.Context, request domain.CleaningOrder) error {
+			return nil
+		}
+
+		fakeNotifications.HourNotificationFn = func(ctx context.Context, timerCh chan interface{}, hour int) {
+			switch hour {
+			case 6, 18:
+				timerCh <- struct{}{}
+			default:
+				t.Fatalf("HourNotification() unexpected hour: %d", hour)
+			}
+		}
+		dayDeliveries <- amqp.Delivery{
+			Acknowledger: &mqfakes.FakeAcknowledger{},
+			DeliveryTag:  1,
+			Body:         mustMarshalTimeEventStay(t, time.Date(2026, 3, 24, 0, 0, 0, 0, time.UTC)),
+		}
+
+		err = handler.Handle(context.Background(), booking)
+		if err != nil {
+			t.Fatalf("Handle() unexpected error: %v", err)
+		}
+
+		wantWaitedActions := []dto.GuestAction{
+			dto.GuestAction_ENTER_COTTAGE,
+			dto.GuestAction_GO_FOR_A_BATH,
+			dto.GuestAction_GO_FOR_DINNER,
+			dto.GuestAction_GO_TO_SLEEP,
+			dto.GuestAction_WAKEUP,
+			dto.GuestAction_LEAVE_COTTAGE,
+		}
+		if len(waitedActions) != len(wantWaitedActions) {
+			t.Fatalf("Handle() waited actions len = %d, want %d (%+v)", len(waitedActions), len(wantWaitedActions), waitedActions)
+		}
+		for i := range wantWaitedActions {
+			if waitedActions[i] != wantWaitedActions[i] {
+				t.Fatalf("Handle() waited action[%d] = %v, want %v", i, waitedActions[i], wantWaitedActions[i])
+			}
+		}
+		if fakeCleaning.CleanRoomCallCount != 1 {
+			t.Fatalf("Handle() cleaning calls = %d, want 1", fakeCleaning.CleanRoomCallCount)
+		}
+		if !containsNotification(notifications, dto.SystemNotification_CHECK_OUT_TODAY) {
+			t.Fatalf("Handle() notifications = %+v, missing %v", notifications, dto.SystemNotification_CHECK_OUT_TODAY)
+		}
+	})
+
+}
+
+func TestStayHandlerWaitForStayTransitionUsesClockFallback(t *testing.T) {
+	t.Parallel()
+
+	booking := mustBooking(t, "cottage-11")
+	stayPeriod, err := domain.NewPeriod(
+		time.Date(2026, 3, 22, 15, 0, 0, 0, time.UTC),
+		time.Date(2026, 3, 24, 11, 0, 0, 0, time.UTC),
+	)
+	if err != nil {
+		t.Fatalf("NewPeriod() error = %v", err)
+	}
+	booking.StayPeriod = stayPeriod
+
+	currentTime := time.Date(2026, 3, 23, 23, 0, 0, 0, time.UTC)
+	fakeClock := &infrafakes.FakeClockClient{
+		NowFn: func(ctx context.Context) (*time.Time, error) {
+			now := currentTime
+			return &now, nil
+		},
+	}
+
+	handler := NewStayHandler(&fakeNotificationService{}, &appfakes.CleaningService{}, nil, fakeClock, &chatfakes.Writer{}, &chatfakes.Reader{})
+	events := make(chan time.Time, 1)
+	events <- time.Date(2026, 3, 23, 0, 0, 0, 0, time.UTC)
+
+	checkoutReached, err := handler.waitForStayTransition(context.Background(), booking, events)
+	if err != nil {
+		t.Fatalf("waitForStayTransition() unexpected error = %v", err)
+	}
+	if checkoutReached {
+		t.Fatalf("waitForStayTransition() checkoutReached = true, want false before checkout day")
+	}
+
+	currentTime = time.Date(2026, 3, 24, 0, 1, 0, 0, time.UTC)
+
+	checkoutReached, err = handler.waitForStayTransition(context.Background(), booking, events)
+	if err != nil {
+		t.Fatalf("waitForStayTransition() unexpected error after clock advance = %v", err)
+	}
+	if !checkoutReached {
+		t.Fatalf("waitForStayTransition() checkoutReached = false, want true after checkout day")
+	}
 }
 
 func TestStayHandlerStayRoutine(t *testing.T) {
@@ -172,17 +288,16 @@ func TestStayHandlerStayRoutine(t *testing.T) {
 
 	fakeCleaning := &appfakes.CleaningService{}
 	fakeReader := &chatfakes.Reader{}
-	handler := NewStayHandler(&fakeNotificationService{}, fakeCleaning, nil, &chatfakes.Writer{}, fakeReader)
+	fakeNotifications := &fakeNotificationService{}
+	fakeNotifications.HourNotificationFn = func(ctx context.Context, timerCh chan interface{}, hour int) {
+		timerCh <- struct{}{}
+	}
+	handler := NewStayHandler(fakeNotifications, fakeCleaning, nil, nil, &chatfakes.Writer{}, fakeReader)
 	booking := mustBooking(t, "cottage-12")
 
-	waitedActions := make([]dto.GuestAction, 0, 2)
-	ackedActions := 0
+	waitedActions := make([]dto.GuestAction, 0, 5)
 	cleaningRequests := make([]domain.CleaningOrder, 0, 2)
 
-	fakeReader.AckGuestActionFn = func(ctx context.Context) error {
-		ackedActions++
-		return nil
-	}
 	fakeReader.WaitForGuestActionFn = func(ctx context.Context, action dto.GuestAction) (*dto.ChatMessage, error) {
 		waitedActions = append(waitedActions, action)
 		return &dto.ChatMessage{
@@ -199,12 +314,17 @@ func TestStayHandlerStayRoutine(t *testing.T) {
 		t.Fatalf("stayRoutine() unexpected error: %v", err)
 	}
 
-	if ackedActions != 5 {
-		t.Fatalf("stayRoutine() acked actions = %d, want 5", ackedActions)
-	}
 	wantWaitedActions := []dto.GuestAction{
+		dto.GuestAction_WAKEUP,
+		dto.GuestAction_GO_FOR_BREAKFAST,
 		dto.GuestAction_LEAVE_CLEANUP_NOTIFICATION,
+		dto.GuestAction_ENJOY_RESORT,
+		dto.GuestAction_GO_FOR_A_BATH,
 		dto.GuestAction_GO_FOR_DINNER,
+		dto.GuestAction_GO_TO_SLEEP,
+	}
+	if len(waitedActions) != len(wantWaitedActions) {
+		t.Fatalf("stayRoutine() waited actions len = %d, want %d (%+v)", len(waitedActions), len(wantWaitedActions), waitedActions)
 	}
 	for i := range wantWaitedActions {
 		if waitedActions[i] != wantWaitedActions[i] {
@@ -227,16 +347,14 @@ func TestStayHandlerCheckInDayRoutine(t *testing.T) {
 
 	fakeCleaning := &appfakes.CleaningService{}
 	fakeReader := &chatfakes.Reader{}
-	handler := NewStayHandler(&fakeNotificationService{}, fakeCleaning, nil, &chatfakes.Writer{}, fakeReader)
+	fakeNotifications := &fakeNotificationService{}
+	fakeNotifications.HourNotificationFn = func(ctx context.Context, timerCh chan interface{}, hour int) {
+		timerCh <- struct{}{}
+	}
+	handler := NewStayHandler(fakeNotifications, fakeCleaning, nil, nil, &chatfakes.Writer{}, fakeReader)
 	booking := mustBooking(t, "cottage-14")
 
-	ackedActions := 0
-	waitedActions := make([]dto.GuestAction, 0, 1)
-
-	fakeReader.AckGuestActionFn = func(ctx context.Context) error {
-		ackedActions++
-		return nil
-	}
+	waitedActions := make([]dto.GuestAction, 0, 4)
 	fakeReader.WaitForGuestActionFn = func(ctx context.Context, action dto.GuestAction) (*dto.ChatMessage, error) {
 		waitedActions = append(waitedActions, action)
 		return &dto.ChatMessage{
@@ -249,10 +367,21 @@ func TestStayHandlerCheckInDayRoutine(t *testing.T) {
 		t.Fatalf("checkInDayRoutine() unexpected error: %v", err)
 	}
 
-	if ackedActions != 3 {
-		t.Fatalf("checkInDayRoutine() acked actions = %d, want 3", ackedActions)
+	wantWaitedActions := []dto.GuestAction{
+		dto.GuestAction_ENTER_COTTAGE,
+		dto.GuestAction_GO_FOR_A_BATH,
+		dto.GuestAction_GO_FOR_DINNER,
+		dto.GuestAction_GO_TO_SLEEP,
 	}
-	if len(waitedActions) != 1 || waitedActions[0] != dto.GuestAction_GO_FOR_DINNER {
+	if len(waitedActions) != len(wantWaitedActions) {
+		t.Fatalf("checkInDayRoutine() waited actions len = %d, want %d (%+v)", len(waitedActions), len(wantWaitedActions), waitedActions)
+	}
+	for i := range wantWaitedActions {
+		if waitedActions[i] != wantWaitedActions[i] {
+			t.Fatalf("checkInDayRoutine() waited action[%d] = %v, want %v", i, waitedActions[i], wantWaitedActions[i])
+		}
+	}
+	if len(waitedActions) != 4 {
 		t.Fatalf("checkInDayRoutine() waited actions = %+v", waitedActions)
 	}
 	if fakeCleaning.CleanRoomCallCount != 1 {
@@ -263,10 +392,43 @@ func TestStayHandlerCheckInDayRoutine(t *testing.T) {
 	}
 }
 
+func TestStayHandlerCheckoutDayRoutine(t *testing.T) {
+	t.Parallel()
+
+	fakeReader := &chatfakes.Reader{}
+	handler := NewStayHandler(&fakeNotificationService{}, &appfakes.CleaningService{}, nil, nil, &chatfakes.Writer{}, fakeReader)
+
+	waitedActions := make([]dto.GuestAction, 0, 2)
+	fakeReader.WaitForGuestActionFn = func(ctx context.Context, action dto.GuestAction) (*dto.ChatMessage, error) {
+		waitedActions = append(waitedActions, action)
+		return &dto.ChatMessage{
+			Payload: &dto.ChatMessage_GuestAction{GuestAction: action},
+		}, nil
+	}
+
+	err := handler.checkoutDayRoutine(context.Background())
+	if err != nil {
+		t.Fatalf("checkoutDayRoutine() unexpected error: %v", err)
+	}
+
+	wantWaitedActions := []dto.GuestAction{
+		dto.GuestAction_WAKEUP,
+		dto.GuestAction_LEAVE_COTTAGE,
+	}
+	if len(waitedActions) != len(wantWaitedActions) {
+		t.Fatalf("checkoutDayRoutine() waited actions len = %d, want %d (%+v)", len(waitedActions), len(wantWaitedActions), waitedActions)
+	}
+	for i := range wantWaitedActions {
+		if waitedActions[i] != wantWaitedActions[i] {
+			t.Fatalf("checkoutDayRoutine() waited action[%d] = %v, want %v", i, waitedActions[i], wantWaitedActions[i])
+		}
+	}
+}
+
 func TestStayHandlerWaitDayChangeEvent(t *testing.T) {
 	t.Parallel()
 
-	handler := NewStayHandler(&fakeNotificationService{}, &appfakes.CleaningService{}, nil, &chatfakes.Writer{}, &chatfakes.Reader{})
+	handler := NewStayHandler(&fakeNotificationService{}, &appfakes.CleaningService{}, nil, nil, &chatfakes.Writer{}, &chatfakes.Reader{})
 
 	t.Run("returns event", func(t *testing.T) {
 		events := make(chan time.Time, 1)
@@ -303,13 +465,58 @@ func TestStayHandlerWaitDayChangeEvent(t *testing.T) {
 	})
 }
 
+func TestIsCheckoutToday(t *testing.T) {
+	t.Parallel()
+
+	booking := mustBooking(t, "cottage-18")
+	stayPeriod, err := domain.NewPeriod(
+		time.Date(2026, 3, 22, 15, 0, 0, 0, time.UTC),
+		time.Date(2026, 3, 24, 11, 0, 0, 0, time.UTC),
+	)
+	if err != nil {
+		t.Fatalf("NewPeriod() error = %v", err)
+	}
+	booking.StayPeriod = stayPeriod
+
+	tests := []struct {
+		name      string
+		timeEvent time.Time
+		want      bool
+	}{
+		{
+			name:      "before checkout day",
+			timeEvent: time.Date(2026, 3, 23, 0, 0, 0, 0, time.UTC),
+			want:      false,
+		},
+		{
+			name:      "on checkout day",
+			timeEvent: time.Date(2026, 3, 24, 0, 0, 0, 0, time.UTC),
+			want:      true,
+		},
+		{
+			name:      "after checkout day",
+			timeEvent: time.Date(2026, 3, 25, 0, 0, 0, 0, time.UTC),
+			want:      true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := isCheckoutToday(booking, tt.timeEvent)
+			if got != tt.want {
+				t.Fatalf("isCheckoutToday() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestStayHandlerNotifyBreakfast(t *testing.T) {
 	t.Parallel()
 
 	t.Run("sends breakfast notification when event arrives", func(t *testing.T) {
 		fakeWriter := &chatfakes.Writer{}
 		fakeNotifications := &fakeNotificationService{}
-		handler := NewStayHandler(fakeNotifications, &appfakes.CleaningService{}, nil, fakeWriter, &chatfakes.Reader{})
+		handler := NewStayHandler(fakeNotifications, &appfakes.CleaningService{}, nil, nil, fakeWriter, &chatfakes.Reader{})
 
 		events := make(chan interface{}, 1)
 		ctx, cancel := context.WithCancel(context.Background())
@@ -341,7 +548,7 @@ func TestStayHandlerNotifyBreakfast(t *testing.T) {
 	t.Run("wraps writer error", func(t *testing.T) {
 		fakeWriter := &chatfakes.Writer{}
 		fakeNotifications := &fakeNotificationService{}
-		handler := NewStayHandler(fakeNotifications, &appfakes.CleaningService{}, nil, fakeWriter, &chatfakes.Reader{})
+		handler := NewStayHandler(fakeNotifications, &appfakes.CleaningService{}, nil, nil, fakeWriter, &chatfakes.Reader{})
 		wantErr := errors.New("writer failed")
 
 		events := make(chan interface{}, 1)
@@ -366,7 +573,7 @@ func TestStayHandlerNotifyDinner(t *testing.T) {
 
 	fakeWriter := &chatfakes.Writer{}
 	fakeNotifications := &fakeNotificationService{}
-	handler := NewStayHandler(fakeNotifications, &appfakes.CleaningService{}, nil, fakeWriter, &chatfakes.Reader{})
+	handler := NewStayHandler(fakeNotifications, &appfakes.CleaningService{}, nil, nil, fakeWriter, &chatfakes.Reader{})
 
 	events := make(chan interface{}, 1)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -401,7 +608,7 @@ func TestStayHandlerNotifyCheckoutToday(t *testing.T) {
 	t.Run("sends checkout notification when bookings exist", func(t *testing.T) {
 		fakeWriter := &chatfakes.Writer{}
 		fakeNotifications := &fakeNotificationService{}
-		handler := NewStayHandler(fakeNotifications, &appfakes.CleaningService{}, nil, fakeWriter, &chatfakes.Reader{})
+		handler := NewStayHandler(fakeNotifications, &appfakes.CleaningService{}, nil, nil, fakeWriter, &chatfakes.Reader{})
 
 		checkoutCh := make(chan []domain.Booking, 1)
 		fakeNotifications.CheckOutNotificationFn = func(ctx context.Context, bookingCh chan []domain.Booking) {
@@ -424,7 +631,7 @@ func TestStayHandlerNotifyCheckoutToday(t *testing.T) {
 	t.Run("returns context error when canceled before notification arrives", func(t *testing.T) {
 		fakeWriter := &chatfakes.Writer{}
 		fakeNotifications := &fakeNotificationService{}
-		handler := NewStayHandler(fakeNotifications, &appfakes.CleaningService{}, nil, fakeWriter, &chatfakes.Reader{})
+		handler := NewStayHandler(fakeNotifications, &appfakes.CleaningService{}, nil, nil, fakeWriter, &chatfakes.Reader{})
 
 		ctx, cancel := context.WithCancel(context.Background())
 		fakeWriter.SendSystemNotificationFn = func(ctx context.Context, notification dto.SystemNotification) error {

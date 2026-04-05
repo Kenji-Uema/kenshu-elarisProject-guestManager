@@ -7,13 +7,14 @@ import (
 )
 
 type Dependencies struct {
-	GuestRepo          port.GuestRepo
-	BookingRepo        port.BookingRepo
-	CottageRepo        port.CottageRepo
-	CleaningPublisher  port.MqPublisher
-	HourChangeConsumer port.MqConsumer
-	DayChangeConsumer  port.MqConsumer
-	Cache              port.Cache
+	GuestRepo             port.GuestRepo
+	BookingRepo           port.BookingRepo
+	CottageRepo           port.CottageRepo
+	CleaningPublisher     port.MqPublisher
+	GuestCommunicationPub port.MqPublisher
+	HourChangeConsumer    port.MqConsumer
+	DayChangeConsumer     port.MqConsumer
+	Cache                 port.Cache
 }
 
 type Services struct {
@@ -22,6 +23,7 @@ type Services struct {
 	Reception    ReceptionService
 	TimeEvents   TimeEventService
 	Notification NotificationService
+	Arrange      ArrangeCottageService
 }
 
 func NewServices(ctx context.Context, deps Dependencies) (Services, error) {
@@ -58,11 +60,18 @@ func NewServices(ctx context.Context, deps Dependencies) (Services, error) {
 		return Services{}, err
 	}
 
+	arrange, err := NewArrangeCottageService(deps.BookingRepo, timeEvents, deps.Cache, deps.GuestCommunicationPub)
+	if err != nil {
+		return Services{}, err
+	}
+	go arrange.ArrangeCheckIn(ctx)
+
 	return Services{
 		Guest:        guest,
 		Cleaning:     cleaning,
 		Reception:    reception,
 		TimeEvents:   timeEvents,
 		Notification: notification,
+		Arrange:      arrange,
 	}, nil
 }

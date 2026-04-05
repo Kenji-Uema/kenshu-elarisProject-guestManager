@@ -23,8 +23,8 @@ const TimeEventDayChange timeEventType = "day_change"
 
 type TimeEventService interface {
 	Start(ctx context.Context)
-	Register(eventType TimeEventType, ch chan<- time.Time)
-	Unregister(eventType TimeEventType, ch chan<- time.Time)
+	Register(eventType TimeEventType, ch chan time.Time)
+	Unregister(eventType TimeEventType, ch chan time.Time)
 }
 
 type timeEventService struct {
@@ -32,9 +32,9 @@ type timeEventService struct {
 	dayChangeClient  port.MqConsumer
 
 	hourChangeChannelsMu sync.RWMutex
-	hourChangeChannels   *domain.Set[chan<- time.Time]
+	hourChangeChannels   *domain.Set[chan time.Time]
 	dayChangeChannelsMu  sync.RWMutex
-	dayChangeChannels    *domain.Set[chan<- time.Time]
+	dayChangeChannels    *domain.Set[chan time.Time]
 }
 
 func NewTimeEventService(hourChangeClient port.MqConsumer, dayChangeClient port.MqConsumer) (TimeEventService, error) {
@@ -48,15 +48,15 @@ func NewTimeEventService(hourChangeClient port.MqConsumer, dayChangeClient port.
 	return &timeEventService{
 		hourChangeClient:   hourChangeClient,
 		dayChangeClient:    dayChangeClient,
-		hourChangeChannels: domain.NewSet[chan<- time.Time](),
-		dayChangeChannels:  domain.NewSet[chan<- time.Time](),
+		hourChangeChannels: domain.NewSet[chan time.Time](),
+		dayChangeChannels:  domain.NewSet[chan time.Time](),
 	}, nil
 }
 
 func NewInMemoryTimeEventService() TimeEventService {
 	return &timeEventService{
-		hourChangeChannels: domain.NewSet[chan<- time.Time](),
-		dayChangeChannels:  domain.NewSet[chan<- time.Time](),
+		hourChangeChannels: domain.NewSet[chan time.Time](),
+		dayChangeChannels:  domain.NewSet[chan time.Time](),
 	}
 }
 
@@ -111,7 +111,7 @@ func (s *timeEventService) Start(ctx context.Context) {
 	}
 }
 
-func (s *timeEventService) Register(eventType timeEventType, ch chan<- time.Time) {
+func (s *timeEventService) Register(eventType timeEventType, ch chan time.Time) {
 	if ch == nil {
 		return
 	}
@@ -128,7 +128,7 @@ func (s *timeEventService) Register(eventType timeEventType, ch chan<- time.Time
 	}
 }
 
-func (s *timeEventService) Unregister(eventType timeEventType, ch chan<- time.Time) {
+func (s *timeEventService) Unregister(eventType timeEventType, ch chan time.Time) {
 	if ch == nil {
 		return
 	}
@@ -180,14 +180,19 @@ func (s *timeEventService) notifyHourChange(ctx context.Context, currentTime tim
 }
 
 func (s *timeEventService) notifyDayChange(ctx context.Context, currentTime time.Time) {
+	if !isMidnightUTC(currentTime) {
+		slog.WarnContext(ctx, "ignored invalid day change event", "currentTime", currentTime)
+		return
+	}
+
 	s.dayChangeChannelsMu.RLock()
 	channels := s.dayChangeChannels.Values()
 	s.dayChangeChannelsMu.RUnlock()
 
-	s.notify(ctx, currentTime, channels, "day change")
+	s.notifyLatest(ctx, currentTime, channels, "day change")
 }
 
-func (s *timeEventService) notify(ctx context.Context, currentTime time.Time, channels []chan<- time.Time, eventName string) {
+func (s *timeEventService) notify(ctx context.Context, currentTime time.Time, channels []chan time.Time, eventName string) {
 	for _, ch := range channels {
 		select {
 		case ch <- currentTime:
@@ -196,6 +201,32 @@ func (s *timeEventService) notify(ctx context.Context, currentTime time.Time, ch
 			slog.WarnContext(ctx, "skipped "+eventName+" event for busy subscriber", "currentTime", currentTime)
 		}
 	}
+}
+
+func (s *timeEventService) notifyLatest(ctx context.Context, currentTime time.Time, channels []chan time.Time, eventName string) {
+	for _, ch := range channels {
+		select {
+		case ch <- currentTime:
+			slog.DebugContext(ctx, "published "+eventName+" event to subscriber", "currentTime", currentTime)
+		default:
+			select {
+			case <-ch:
+			default:
+			}
+
+			select {
+			case ch <- currentTime:
+				slog.DebugContext(ctx, "replaced stale "+eventName+" event for busy subscriber", "currentTime", currentTime)
+			default:
+				slog.WarnContext(ctx, "skipped "+eventName+" event for busy subscriber", "currentTime", currentTime)
+			}
+		}
+	}
+}
+
+func isMidnightUTC(currentTime time.Time) bool {
+	utcTime := currentTime.UTC()
+	return utcTime.Hour() == 0 && utcTime.Minute() == 0 && utcTime.Second() == 0 && utcTime.Nanosecond() == 0
 }
 
 func (s *timeEventService) ackDelivery(ctx context.Context, delivery amqp.Delivery, deliveryName string) {

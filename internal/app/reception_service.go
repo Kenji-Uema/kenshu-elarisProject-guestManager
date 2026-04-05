@@ -12,7 +12,12 @@ import (
 	"github.com/Kenji-Uema/guestManager/internal/domain/enum"
 	"github.com/Kenji-Uema/guestManager/internal/port"
 	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 )
+
+var receptionServiceTracer = otel.Tracer("guest-manager.app.reception-service")
 
 type ReceptionService interface {
 	CheckIn(ctx context.Context, guestDocument string, today time.Time) (domain.Booking, error)
@@ -56,8 +61,17 @@ func NewReceptionService(guestService GuestService, cleaningService CleaningServ
 }
 
 func (r receptionService) CheckIn(ctx context.Context, document string, today time.Time) (domain.Booking, error) {
+	ctx, span := receptionServiceTracer.Start(ctx, "ReceptionService.CheckIn")
+	defer span.End()
+	span.SetAttributes(
+		attribute.String("guest.document_id", document),
+		attribute.String("booking.checkin_date", today.UTC().Format(time.RFC3339)),
+	)
+
 	guest, err := r.guestService.GetByDocument(ctx, document)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "guest_lookup_failed")
 		return domain.Booking{}, fmt.Errorf("failed to get guest %s: %w", document, err)
 	}
 
@@ -65,15 +79,27 @@ func (r receptionService) CheckIn(ctx context.Context, document string, today ti
 	if err != nil || booking == (domain.Booking{}) {
 		booking, err = r.guestService.GetBookingByDate(ctx, document, today)
 		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "booking_lookup_failed")
 			return domain.Booking{}, fmt.Errorf("failed to get booking for guest %s: %w", document, err)
 		}
 	}
 
 	if booking == (domain.Booking{}) {
-		return domain.Booking{}, fmt.Errorf("no booking found for guest %s", document)
+		err := fmt.Errorf("no booking found for guest %s", document)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "booking_not_found")
+		return domain.Booking{}, err
 	}
 
+	span.SetAttributes(
+		attribute.String("booking.id", booking.Id.Hex()),
+		attribute.String("booking.cottage_name", booking.CottageName),
+	)
+
 	if err := r.processCheckIn(ctx, document, booking, guest, today); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "checkin_processing_failed")
 		return domain.Booking{}, err
 	}
 	return booking, nil
@@ -125,28 +151,49 @@ func (r receptionService) CheckinFallback(ctx context.Context, document string, 
 }
 
 func (r receptionService) CheckOut(ctx context.Context, booking domain.Booking, today time.Time) error {
-	if !sameUTCDay(booking.StayPeriod.CheckOut, today) {
-		return fmt.Errorf("checkout day not today")
-	}
+	ctx, span := receptionServiceTracer.Start(ctx, "ReceptionService.CheckOut")
+	defer span.End()
+	span.SetAttributes(
+		attribute.String("booking.id", booking.Id.Hex()),
+		attribute.String("booking.cottage_name", booking.CottageName),
+		attribute.String("booking.checkout_date", today.UTC().Format(time.RFC3339)),
+	)
+
+	// if !sameUTCDay(booking.StayPeriod.CheckOut, today) {
+	// 	err := fmt.Errorf("checkout day not today")
+	// 	span.RecordError(err)
+	// 	span.SetStatus(codes.Error, "checkout_day_mismatch")
+	// 	return err
+	// }
 
 	cottageName := booking.CottageName
 	if err := r.bookingRepo.UpdateStatus(ctx, booking.Id, enum.BookingStatusPast); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "booking_status_update_failed")
 		return fmt.Errorf("failed to update booking status for room %s: %w", cottageName, err)
 	}
 
 	if err := r.cottageRepo.RemovePastBooking(ctx, booking.Id); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "remove_past_booking_failed")
 		return fmt.Errorf("failed to remove past booking for room %s: %w", cottageName, err)
 	}
 
 	if err := r.cottageRepo.UpdateCurrentGuest(ctx, cottageName, bson.NilObjectID); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "current_guest_clear_failed")
 		return fmt.Errorf("failed to update current guest for room %s: %w", cottageName, err)
 	}
 
 	cleaningRequest, err := domain.NewCleaningOrder(cottageName, enum.FullCleaning)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "cleaning_order_creation_failed")
 		return fmt.Errorf("failed to create cleaning request for room %s: %w", cottageName, err)
 	}
 	if err := r.cleaningService.CleanRoom(ctx, cleaningRequest); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "cleaning_request_failed")
 		return fmt.Errorf("failed to request cleaning for room %s: %w", cottageName, err)
 	}
 
@@ -170,13 +217,22 @@ func (r receptionService) ReturnCottageKey(ctx context.Context, cottageName stri
 }
 
 func (r receptionService) getFromCache(ctx context.Context, today time.Time, err error, guest domain.Guest) (domain.Booking, error) {
+	ctx, span := receptionServiceTracer.Start(ctx, "ReceptionService.getFromCache")
+	defer span.End()
+
 	var booking domain.Booking
 	redisKey := fmt.Sprintf("checkin.%s", today.UTC().Format("2006-01-02"))
+	span.SetAttributes(
+		attribute.String("cache.key", redisKey),
+		attribute.String("guest.id", guest.Id.Hex()),
+	)
 	cachedBookingsJSON, err := r.cache.GetBytes(ctx, redisKey)
 
 	if err != nil {
+		span.SetAttributes(attribute.Bool("cache.hit", false))
 		return domain.Booking{}, nil
 	}
+	span.SetAttributes(attribute.Bool("cache.hit", true))
 
 	var cachedBookings []domain.Booking
 	if err := json.Unmarshal(cachedBookingsJSON, &cachedBookings); err == nil {
@@ -193,32 +249,58 @@ func (r receptionService) getFromCache(ctx context.Context, today time.Time, err
 }
 
 func (r receptionService) processCheckIn(ctx context.Context, document string, booking domain.Booking, guest domain.Guest, today time.Time) error {
+	ctx, span := receptionServiceTracer.Start(ctx, "ReceptionService.processCheckIn")
+	defer span.End()
+	span.SetAttributes(
+		attribute.String("guest.document_id", document),
+		attribute.String("guest.id", guest.Id.Hex()),
+		attribute.String("booking.id", booking.Id.Hex()),
+		attribute.String("booking.cottage_name", booking.CottageName),
+	)
+
 	if !sameUTCDay(booking.StayPeriod.CheckIn, today) {
-		return fmt.Errorf("checkin day not today")
+		err := fmt.Errorf("checkin day not today")
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "checkin_day_mismatch")
+		return err
 	}
 
 	if booking.Status != enum.BookingStatusConfirmed {
-		return fmt.Errorf("booking for guest %s is not confirmed", document)
+		err := fmt.Errorf("booking for guest %s is not confirmed", document)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "booking_not_confirmed")
+		return err
 	}
 
 	cottage, err := r.cottageRepo.GetByName(ctx, booking.CottageName)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "cottage_lookup_failed")
 		return fmt.Errorf("failed to get cottage %s: %w", booking.CottageName, err)
 	}
 
 	if cottage.CurrentGuest != bson.NilObjectID || cottage.CleaningStatus != enum.FullyCleaned {
-		return fmt.Errorf("cottage %s is not available", booking.CottageName)
+		err := fmt.Errorf("cottage %s is not available", booking.CottageName)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "cottage_not_ready")
+		return err
 	}
 
 	if err := r.cottageRepo.UpdateCurrentGuest(ctx, booking.CottageName, guest.Id); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "current_guest_update_failed")
 		return fmt.Errorf("failed to update current guest for room %s: %w", booking.CottageName, err)
 	}
 
 	cleaningRequest, err := domain.NewCleaningOrder(booking.CottageName, enum.PrepareForGuest)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "cleaning_order_creation_failed")
 		return fmt.Errorf("failed to create cleaning request for room %s: %w", booking.CottageName, err)
 	}
 	if err := r.cleaningService.CleanRoom(ctx, cleaningRequest); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "cleaning_request_failed")
 		return fmt.Errorf("failed to request cottage preparation for room %s: %w", booking.CottageName, err)
 	}
 

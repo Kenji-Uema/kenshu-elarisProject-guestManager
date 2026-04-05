@@ -300,6 +300,83 @@ func TestTimeEventNotificationServiceStart(t *testing.T) {
 		close(dayDeliveries)
 		<-done
 	})
+
+	t.Run("ignores non-midnight day change events", func(t *testing.T) {
+		invalidEvent := time.Date(2026, 3, 19, 18, 0, 0, 0, time.UTC)
+
+		hourConsumer := &fakes.FakeMqConsumer{
+			ConsumeFn: func(ctx context.Context) (<-chan amqp.Delivery, error) {
+				ch := make(chan amqp.Delivery)
+				go func() {
+					<-ctx.Done()
+					close(ch)
+				}()
+				return ch, nil
+			},
+		}
+		dayConsumer := &fakes.FakeMqConsumer{}
+		dayConsumer.ConsumeFn = func(ctx context.Context) (<-chan amqp.Delivery, error) {
+			ch := make(chan amqp.Delivery, 1)
+			ack := &fakes.FakeAcknowledger{}
+			dayConsumer.LastAck = ack
+			ch <- amqp.Delivery{
+				Acknowledger: ack,
+				DeliveryTag:  1,
+				Body:         mustMarshalTimeEvent(t, invalidEvent),
+			}
+			close(ch)
+			return ch, nil
+		}
+
+		service, err := NewTimeEventService(hourConsumer, dayConsumer)
+		if err != nil {
+			t.Fatalf("NewTimeEventService() error = %v", err)
+		}
+
+		dayCh := make(chan time.Time, 1)
+		service.Register(TimeEventDayChange, dayCh)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		done := make(chan struct{})
+		go func() {
+			service.Start(ctx)
+			close(done)
+		}()
+
+		select {
+		case got := <-dayCh:
+			t.Fatalf("received unexpected invalid day change event: %v", got)
+		case <-time.After(50 * time.Millisecond):
+		}
+
+		cancel()
+		<-done
+
+		if dayConsumer.LastAck == nil {
+			t.Fatal("expected acknowledger to be captured")
+		}
+		if dayConsumer.LastAck.AckCalls != 1 {
+			t.Fatalf("AckCalls = %d, want 1", dayConsumer.LastAck.AckCalls)
+		}
+	})
+
+	t.Run("replaces stale day change event for busy subscriber", func(t *testing.T) {
+		firstEvent := time.Date(2026, 3, 19, 0, 0, 0, 0, time.UTC)
+		secondEvent := firstEvent.Add(24 * time.Hour)
+		service := NewInMemoryTimeEventService()
+		timeEvents, ok := service.(*timeEventService)
+		if !ok {
+			t.Fatalf("NewInMemoryTimeEventService() returned %T, want *timeEventService", service)
+		}
+		dayCh := make(chan time.Time, 1)
+		timeEvents.Register(TimeEventDayChange, dayCh)
+
+		ctx := context.Background()
+		timeEvents.notifyDayChange(ctx, firstEvent)
+		timeEvents.notifyDayChange(ctx, secondEvent)
+
+		assertPublishedTime(t, dayCh, secondEvent)
+	})
 }
 
 func assertPublishedTime(t *testing.T, ch <-chan time.Time, want time.Time) {

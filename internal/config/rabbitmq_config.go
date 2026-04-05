@@ -12,8 +12,8 @@ type RabbitMqConsumerConfig struct {
 }
 
 type ExchangeConfig struct {
-	Name       string `env:"NAME,required"`
-	Kind       string `env:"KIND,required"`
+	Name       string `env:"NAME,required" envDefault:"ex.communication"`
+	Kind       string `env:"KIND,required" envDefault:"direct"`
 	Durable    bool   `env:"DURABLE" envDefault:"true"`
 	AutoDelete bool   `env:"AUTO_DELETE" envDefault:"false"`
 	Internal   bool   `env:"INTERNAL" envDefault:"false"`

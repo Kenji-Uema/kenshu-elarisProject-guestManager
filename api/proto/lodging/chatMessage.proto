@@ -16,6 +16,8 @@ message ChatMessage {
   Sender sender = 4;
   // Protocol contract version (for example: "lodging.v1").
   string protocol_version = 12;
+  // Per-message trace propagation payload.
+  map<string, string> trace_context = 13;
 
   // Exactly one payload variant per envelope.
   oneof payload {

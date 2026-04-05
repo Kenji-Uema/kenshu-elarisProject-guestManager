@@ -181,7 +181,7 @@ func TestCheckoutHandlerRequestCottageKey(t *testing.T) {
 			}, nil
 		}
 
-		got, err := handler.requestCottageKey(context.Background())
+		_, got, err := handler.requestCottageKey(context.Background())
 		if err != nil {
 			t.Fatalf("requestCottageKey() unexpected error: %v", err)
 		}
@@ -203,7 +203,7 @@ func TestCheckoutHandlerRequestCottageKey(t *testing.T) {
 			},
 		}
 
-		_, err := handler.requestCottageKey(context.Background())
+		_, _, err := handler.requestCottageKey(context.Background())
 		if !errors.Is(err, ErrUnexpectedResponse) {
 			t.Fatalf("requestCottageKey() expected ErrUnexpectedResponse, got %v", err)
 		}

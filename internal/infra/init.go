@@ -23,11 +23,12 @@ type Mongo struct {
 }
 
 type Rabbitmq struct {
-	Connection         *mq.RabbitMqConnection
-	CleaningPublisher  port.MqPublisher
-	DayChangeConsumer  port.MqConsumer
-	HourChangeConsumer port.MqConsumer
-	ConnectionClose    func(context.Context) error
+	Connection            *mq.RabbitMqConnection
+	CleaningPublisher     port.MqPublisher
+	GuestCommunicationPub port.MqPublisher
+	DayChangeConsumer     port.MqConsumer
+	HourChangeConsumer    port.MqConsumer
+	ConnectionClose       func(context.Context) error
 }
 
 type Redis struct {
@@ -77,6 +78,19 @@ func NewRabbitmq(ctx context.Context, configs config.RabbitMqConfig) (Rabbitmq, 
 		return cleaningPublisher.CloseChannel()
 	})
 
+	guestCommunicationPublisher, err := mq.NewRabbitmqProducer(rabbitConn, configs.Producers.GuestCommunication.Publish)
+	if err != nil {
+		_ = runCleanup(ctx, cleanup)
+		return Rabbitmq{}, err
+	}
+	if err := guestCommunicationPublisher.DeclareExchange(configs.Producers.GuestCommunication.Exchange); err != nil {
+		_ = runCleanup(ctx, cleanup)
+		return Rabbitmq{}, fmt.Errorf("declare guest communication exchange: %w", err)
+	}
+	cleanup = append(cleanup, func(context.Context) error {
+		return guestCommunicationPublisher.CloseChannel()
+	})
+
 	dayChangeConsumer, err := mq.NewRabbitmqConsumer(rabbitConn, configs.Consumers.DayChange.Consume)
 	if err != nil {
 		_ = runCleanup(ctx, cleanup)
@@ -105,11 +119,12 @@ func NewRabbitmq(ctx context.Context, configs config.RabbitMqConfig) (Rabbitmq, 
 	}
 
 	return Rabbitmq{
-		Connection:         rabbitConn,
-		CleaningPublisher:  cleaningPublisher,
-		DayChangeConsumer:  dayChangeConsumer,
-		HourChangeConsumer: hourChangeConsumer,
-		ConnectionClose:    func(ctx context.Context) error { return runCleanup(ctx, cleanup) },
+		Connection:            rabbitConn,
+		CleaningPublisher:     cleaningPublisher,
+		GuestCommunicationPub: guestCommunicationPublisher,
+		DayChangeConsumer:     dayChangeConsumer,
+		HourChangeConsumer:    hourChangeConsumer,
+		ConnectionClose:       func(ctx context.Context) error { return runCleanup(ctx, cleanup) },
 	}, nil
 }
 

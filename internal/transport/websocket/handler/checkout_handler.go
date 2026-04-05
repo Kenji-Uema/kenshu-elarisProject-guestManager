@@ -28,22 +28,24 @@ func (h CheckoutHandler) Handle(ctx context.Context, booking domain.Booking) err
 		return err
 	}
 
-	_, err = h.reader.WaitForGuestAction(ctx, dto.GuestAction_PROCEED_TO_CHECKOUT)
+	msg, err := h.reader.WaitForGuestAction(ctx, dto.GuestAction_PROCEED_TO_CHECKOUT)
 	if err != nil {
 		logHandlerWarn(ctx, "proceed_to_checkout_wait_failed", "error", err)
 		return err
 	}
+	ctx = chat.ContextFromMessage(ctx, msg)
 	logHandlerInfo(ctx, "checkout_started", "cottage_name", booking.CottageName)
 
-	keyNumber, err := h.requestCottageKey(ctx)
+	ctx, keyNumber, err := h.requestCottageKey(ctx)
 	if err != nil {
 		return err
 	}
 	logHandlerInfo(ctx, "cottage_key_requested", "cottage_name", booking.CottageName)
-	if _, err := h.reader.WaitForGuestAction(ctx, dto.GuestAction_RETURN_COTTAGE_KEY); err != nil {
+	if msg, err = h.reader.WaitForGuestAction(ctx, dto.GuestAction_RETURN_COTTAGE_KEY); err != nil {
 		logHandlerError(ctx, "return_cottage_key_wait_failed", "cottage_name", booking.CottageName, "error", err)
 		return err
 	}
+	ctx = chat.ContextFromMessage(ctx, msg)
 	logHandlerInfo(ctx, "cottage_key_returned", "cottage_name", booking.CottageName, "key_number", keyNumber)
 	if err := h.receptionService.ReturnCottageKey(ctx, booking.CottageName, keyNumber); err != nil {
 		logHandlerError(ctx, "cottage_key_return_failed", "cottage_name", booking.CottageName, "key_number", keyNumber, "error", err)
@@ -64,17 +66,18 @@ func (h CheckoutHandler) Handle(ctx context.Context, booking domain.Booking) err
 	return nil
 }
 
-func (h CheckoutHandler) requestCottageKey(ctx context.Context) (string, error) {
+func (h CheckoutHandler) requestCottageKey(ctx context.Context) (context.Context, string, error) {
 	response, err := h.writer.SendSystemRequest(ctx, dto.SystemRequest_REQUEST_COTTAGE_KEY, &dto.GuestResponse{
 		Payload: &dto.GuestResponse_ReturnCottageKey{},
 	})
 	if err != nil {
-		return "", err
+		return ctx, "", err
 	}
+	responseCtx := chat.ContextFromMessage(ctx, response)
 
 	guestResponse := response.GetGuestResponse()
 	if guestResponse == nil || guestResponse.GetReturnCottageKey() == nil {
-		return "", ErrUnexpectedResponse
+		return responseCtx, "", ErrUnexpectedResponse
 	}
-	return guestResponse.GetReturnCottageKey().GetCottageKeyId(), nil
+	return responseCtx, guestResponse.GetReturnCottageKey().GetCottageKeyId(), nil
 }

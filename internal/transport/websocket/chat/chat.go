@@ -12,6 +12,8 @@ import (
 	"github.com/Kenji-Uema/guestManager/internal/domain/errors/chatErrors"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
@@ -54,6 +56,14 @@ func (m *chat) WriteOneMessage(ctx context.Context, msg *dto.ChatMessage) error 
 		return ErrEmptyMessageID
 	}
 
+	carrier := propagation.MapCarrier{}
+	otel.GetTextMapPropagator().Inject(ctx, carrier)
+	if len(carrier) > 0 {
+		msg.TraceContext = carrier
+	} else {
+		msg.TraceContext = nil
+	}
+
 	b, err := protojson.Marshal(msg)
 	if err != nil {
 		slog.WarnContext(ctx, "lodging chat",
@@ -79,6 +89,19 @@ func (m *chat) WriteOneMessage(ctx context.Context, msg *dto.ChatMessage) error 
 	slog.InfoContext(ctx, "lodging chat", outgoingMessageAttrs(msg)...)
 
 	return nil
+}
+
+func ContextFromMessage(ctx context.Context, msg *dto.ChatMessage) context.Context {
+	if msg == nil || len(msg.GetTraceContext()) == 0 {
+		return ctx
+	}
+
+	carrier := propagation.MapCarrier{}
+	for key, value := range msg.GetTraceContext() {
+		carrier[key] = value
+	}
+
+	return otel.GetTextMapPropagator().Extract(ctx, carrier)
 }
 
 func (m *chat) ReadOneMessage(ctx context.Context) (*dto.ChatMessage, error) {

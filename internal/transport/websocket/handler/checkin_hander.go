@@ -31,9 +31,11 @@ func NewCheckinHandler(receptionService app.ReceptionService, clock port.ClockCl
 var ErrUnexpectedResponse = errors.New("unexpected websocket response payload")
 
 func (h CheckinHandler) Handle(ctx context.Context) (domain.Booking, error) {
-	if err := h.waitForGuest(ctx); err != nil {
+	guestCtx, err := h.waitForGuest(ctx)
+	if err != nil {
 		return domain.Booking{}, err
 	}
+	ctx = guestCtx
 
 	now, err := h.clock.Now(ctx)
 	if err != nil {
@@ -42,7 +44,7 @@ func (h CheckinHandler) Handle(ctx context.Context) (domain.Booking, error) {
 	}
 
 	var documentID string
-	if documentID, err = h.requestDocumentID(ctx); err != nil {
+	if ctx, documentID, err = h.requestDocumentID(ctx); err != nil {
 		logHandlerError(ctx, "document_request_failed", "error", err)
 		return domain.Booking{}, err
 	}
@@ -59,7 +61,7 @@ func (h CheckinHandler) Handle(ctx context.Context) (domain.Booking, error) {
 		logHandlerWarn(ctx, "checkin_fallback_started", "document_id", documentID, "error", err)
 
 		var bookingID string
-		if bookingID, err = h.requestBookingID(ctx); err != nil {
+		if ctx, bookingID, err = h.requestBookingID(ctx); err != nil {
 			logHandlerError(ctx, "booking_id_request_failed", "document_id", documentID, "error", err)
 			return domain.Booking{}, err
 		}
@@ -79,7 +81,7 @@ func (h CheckinHandler) Handle(ctx context.Context) (domain.Booking, error) {
 		return domain.Booking{}, err
 	}
 
-	keyNumber, err := h.giveCottageKey(ctx)
+	ctx, keyNumber, err := h.giveCottageKey(ctx)
 	if err != nil {
 		logHandlerError(ctx, "cottage_key_request_failed", "cottage_name", booking.CottageName, "error", err)
 		return domain.Booking{}, err
@@ -97,59 +99,63 @@ func (h CheckinHandler) Handle(ctx context.Context) (domain.Booking, error) {
 	return booking, nil
 }
 
-func (h CheckinHandler) waitForGuest(ctx context.Context) error {
+func (h CheckinHandler) waitForGuest(ctx context.Context) (context.Context, error) {
 	msg, err := h.reader.WaitForGuestAction(ctx, dto.GuestAction_SHOW_FOR_CHECKIN)
 	if err != nil {
 		logHandlerWarn(ctx, "show_for_checkin_wait_failed", "error", err)
-		return err
+		return ctx, err
 	}
 
-	logHandlerInfo(ctx, "guest_action_received", guestActionAttrs(msg)...)
+	msgCtx := chat.ContextFromMessage(ctx, msg)
+	logHandlerInfo(msgCtx, "guest_action_received", guestActionAttrs(msg)...)
 
-	return nil
+	return msgCtx, nil
 }
 
-func (h CheckinHandler) requestDocumentID(ctx context.Context) (string, error) {
+func (h CheckinHandler) requestDocumentID(ctx context.Context) (context.Context, string, error) {
 	response, err := h.writer.SendSystemRequest(ctx, dto.SystemRequest_REQUEST_DOCUMENT, &dto.GuestResponse{
 		Payload: &dto.GuestResponse_ShowDocument{},
 	})
 	if err != nil {
-		return "", err
+		return ctx, "", err
 	}
+	responseCtx := chat.ContextFromMessage(ctx, response)
 
 	guestResponse := response.GetGuestResponse()
 	if guestResponse == nil || guestResponse.GetShowDocument() == nil {
-		return "", ErrUnexpectedResponse
+		return responseCtx, "", ErrUnexpectedResponse
 	}
-	return guestResponse.GetShowDocument().GetDocumentId(), nil
+	return responseCtx, guestResponse.GetShowDocument().GetDocumentId(), nil
 }
 
-func (h CheckinHandler) requestBookingID(ctx context.Context) (string, error) {
+func (h CheckinHandler) requestBookingID(ctx context.Context) (context.Context, string, error) {
 	response, err := h.writer.SendSystemRequest(ctx, dto.SystemRequest_REQUEST_BOOKING_NUMBER, &dto.GuestResponse{
 		Payload: &dto.GuestResponse_ShowBookingNumber{},
 	})
 	if err != nil {
-		return "", err
+		return ctx, "", err
 	}
+	responseCtx := chat.ContextFromMessage(ctx, response)
 
 	guestResponse := response.GetGuestResponse()
 	if guestResponse == nil || guestResponse.GetShowBookingNumber() == nil {
-		return "", ErrUnexpectedResponse
+		return responseCtx, "", ErrUnexpectedResponse
 	}
-	return guestResponse.GetShowBookingNumber().GetBookingId(), nil
+	return responseCtx, guestResponse.GetShowBookingNumber().GetBookingId(), nil
 }
 
-func (h CheckinHandler) giveCottageKey(ctx context.Context) (string, error) {
+func (h CheckinHandler) giveCottageKey(ctx context.Context) (context.Context, string, error) {
 	response, err := h.writer.SendSystemRequest(ctx, dto.SystemRequest_GIVE_COTTAGE_KEY, &dto.GuestResponse{
 		Payload: &dto.GuestResponse_ReceiveCottageKey{},
 	})
 	if err != nil {
-		return "", err
+		return ctx, "", err
 	}
+	responseCtx := chat.ContextFromMessage(ctx, response)
 
 	guestResponse := response.GetGuestResponse()
 	if guestResponse == nil || guestResponse.GetReceiveCottageKey() == nil {
-		return "", ErrUnexpectedResponse
+		return responseCtx, "", ErrUnexpectedResponse
 	}
-	return guestResponse.GetReceiveCottageKey().GetCottageKeyId(), nil
+	return responseCtx, guestResponse.GetReceiveCottageKey().GetCottageKeyId(), nil
 }

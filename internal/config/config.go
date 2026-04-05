@@ -69,7 +69,8 @@ type RabbitMqConfig struct {
 	Host      string `env:"RABBITMQ_HOST,required"`
 	Port      int    `env:"RABBITMQ_PORT,required"`
 	Producers struct {
-		Cleaning RabbitMqProducerConfig `envPrefix:"CLEANING_"`
+		Cleaning           RabbitMqProducerConfig `envPrefix:"CLEANING_"`
+		GuestCommunication RabbitMqProducerConfig `envPrefix:"GUEST_COMMUNICATION_"`
 	}
 	Consumers struct {
 		HourChange RabbitMqConsumerConfig `envPrefix:"HOUR_CHANGE_"`

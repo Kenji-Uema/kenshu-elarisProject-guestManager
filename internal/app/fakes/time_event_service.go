@@ -9,8 +9,8 @@ import (
 
 type TimeEventService struct {
 	StartFn      func(ctx context.Context)
-	RegisterFn   func(eventType app.TimeEventType, ch chan<- time.Time)
-	UnregisterFn func(eventType app.TimeEventType, ch chan<- time.Time)
+	RegisterFn   func(eventType app.TimeEventType, ch chan time.Time)
+	UnregisterFn func(eventType app.TimeEventType, ch chan time.Time)
 
 	StartCallCount      int
 	RegisterCallCount   int
@@ -18,9 +18,9 @@ type TimeEventService struct {
 
 	LastStartCtx            context.Context
 	LastRegisterEventType   app.TimeEventType
-	LastRegisterChannel     chan<- time.Time
+	LastRegisterChannel     chan time.Time
 	LastUnregisterEventType app.TimeEventType
-	LastUnregisterChannel   chan<- time.Time
+	LastUnregisterChannel   chan time.Time
 }
 
 func (f *TimeEventService) Start(ctx context.Context) {
@@ -32,7 +32,7 @@ func (f *TimeEventService) Start(ctx context.Context) {
 	}
 }
 
-func (f *TimeEventService) Register(eventType app.TimeEventType, ch chan<- time.Time) {
+func (f *TimeEventService) Register(eventType app.TimeEventType, ch chan time.Time) {
 	f.RegisterCallCount++
 	f.LastRegisterEventType = eventType
 	f.LastRegisterChannel = ch
@@ -42,7 +42,7 @@ func (f *TimeEventService) Register(eventType app.TimeEventType, ch chan<- time.
 	}
 }
 
-func (f *TimeEventService) Unregister(eventType app.TimeEventType, ch chan<- time.Time) {
+func (f *TimeEventService) Unregister(eventType app.TimeEventType, ch chan time.Time) {
 	f.UnregisterCallCount++
 	f.LastUnregisterEventType = eventType
 	f.LastUnregisterChannel = ch

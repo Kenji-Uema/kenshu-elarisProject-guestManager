@@ -7,3 +7,7 @@ tmp
 *.out
 bin
 dist
+.testcontainers-tmp-*
+**/.testcontainers-tmp-*
+guestmanager-testcontainers
+**/guestmanager-testcontainers

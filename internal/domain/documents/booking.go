@@ -17,6 +17,6 @@ type Booking struct {
 }
 
 type Period struct {
-	CheckIn  time.Time `bson:"checkin"`
-	CheckOut time.Time `bson:"checkout"`
+	CheckIn  time.Time `bson:"check_in"`
+	CheckOut time.Time `bson:"check_out"`
 }

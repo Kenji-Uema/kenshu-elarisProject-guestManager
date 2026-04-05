@@ -88,13 +88,14 @@ func main() {
 	}
 
 	services, err := app.NewServices(ctx, app.Dependencies{
-		GuestRepo:          mongoDb.GuestRepo,
-		BookingRepo:        mongoDb.BookingRepo,
-		CottageRepo:        mongoDb.CottageRepo,
-		CleaningPublisher:  rabbitmqInfra.CleaningPublisher,
-		HourChangeConsumer: rabbitmqInfra.HourChangeConsumer,
-		DayChangeConsumer:  rabbitmqInfra.DayChangeConsumer,
-		Cache:              redis.Client,
+		GuestRepo:             mongoDb.GuestRepo,
+		BookingRepo:           mongoDb.BookingRepo,
+		CottageRepo:           mongoDb.CottageRepo,
+		CleaningPublisher:     rabbitmqInfra.CleaningPublisher,
+		GuestCommunicationPub: rabbitmqInfra.GuestCommunicationPub,
+		HourChangeConsumer:    rabbitmqInfra.HourChangeConsumer,
+		DayChangeConsumer:     rabbitmqInfra.DayChangeConsumer,
+		Cache:                 redis.Client,
 	})
 	exitOnError(ctx, "failed to init app services", err)
 

@@ -39,8 +39,8 @@ var newCheckinHandler = func(receptionService app.ReceptionService,
 }
 
 var newStayHandler = func(notificationService app.NotificationService, cleaningService app.CleaningService,
-	timeEventService app.TimeEventService, writer chat.Writer, reader chat.Reader) stayHandler {
-	return handler.NewStayHandler(notificationService, cleaningService, timeEventService, writer, reader)
+	timeEventService app.TimeEventService, clock port.ClockClient, writer chat.Writer, reader chat.Reader) stayHandler {
+	return handler.NewStayHandler(notificationService, cleaningService, timeEventService, clock, writer, reader)
 }
 
 var newCheckoutHandler = func(receptionService app.ReceptionService, clock port.ClockClient,
@@ -121,7 +121,7 @@ func (s *Ws) Handle(c *gin.Context) {
 	reader, writer := chat.NewChat(conn, defaultReplyTimeout, defaultAckTimeout)
 
 	checkinHandler := newCheckinHandler(s.receptionService, s.clockClient, writer, reader)
-	stayHandler := newStayHandler(s.notificationService, s.cleaningService, s.timeEventService, writer, reader)
+	stayHandler := newStayHandler(s.notificationService, s.cleaningService, s.timeEventService, s.clockClient, writer, reader)
 	checkoutHandler := newCheckoutHandler(s.receptionService, s.clockClient, writer, reader)
 
 	booking, err := checkinHandler.Handle(c.Request.Context())

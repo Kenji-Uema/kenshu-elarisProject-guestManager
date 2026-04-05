@@ -11,8 +11,10 @@ import (
 	"github.com/Kenji-Uema/guestManager/internal/app/validation"
 	"github.com/Kenji-Uema/guestManager/internal/domain"
 	"github.com/Kenji-Uema/guestManager/internal/domain/documents"
+	"github.com/Kenji-Uema/guestManager/internal/domain/dto"
 	"github.com/Kenji-Uema/guestManager/internal/domain/errors/validationErrors"
 	"github.com/Kenji-Uema/guestManager/internal/port"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type ArrangeCottageService interface {
@@ -20,24 +22,27 @@ type ArrangeCottageService interface {
 }
 
 type arrangeCottageService struct {
-	bookingRepo      port.BookingRepo
-	timeEventService TimeEventService
-	cache            port.Cache
+	bookingRepo                 port.BookingRepo
+	timeEventService            TimeEventService
+	cache                       port.Cache
+	guestCommunicationPublisher port.MqPublisher
 }
 
-func NewArrangeCottageService(bookingRepo port.BookingRepo, timeEventService TimeEventService, cache port.Cache) (ArrangeCottageService, error) {
+func NewArrangeCottageService(bookingRepo port.BookingRepo, timeEventService TimeEventService, cache port.Cache, guestCommunicationPublisher port.MqPublisher) (ArrangeCottageService, error) {
 	if err := validation.New().
 		NotZeroValue("bookingRepo", bookingRepo).
 		NotZeroValue("timeEventService", timeEventService).
-		NotZeroValue("cache", cache).Validate(); err != nil {
+		NotZeroValue("cache", cache).
+		NotZeroValue("guestCommunicationPublisher", guestCommunicationPublisher).Validate(); err != nil {
 
 		return nil, fmt.Errorf("NewArrangeCottageService: %w", err)
 	}
 
 	return &arrangeCottageService{
-		bookingRepo:      bookingRepo,
-		timeEventService: timeEventService,
-		cache:            cache,
+		bookingRepo:                 bookingRepo,
+		timeEventService:            timeEventService,
+		cache:                       cache,
+		guestCommunicationPublisher: guestCommunicationPublisher,
 	}, nil
 }
 
@@ -71,6 +76,10 @@ func (s arrangeCottageService) ArrangeCheckIn(ctx context.Context) {
 				slog.ErrorContext(ctx, "failed to cache check-in bookings", "error", err)
 				continue
 			}
+			if err := s.publishCheckinTomorrow(ctx, bookings, today); err != nil {
+				slog.ErrorContext(ctx, "failed to publish check-in tomorrow notifications", "error", err)
+				continue
+			}
 			if err := s.cacheCheckOut(ctx, bookings); err != nil {
 				slog.ErrorContext(ctx, "failed to cache check-out bookings", "error", err)
 				continue
@@ -79,6 +88,33 @@ func (s arrangeCottageService) ArrangeCheckIn(ctx context.Context) {
 			slog.InfoContext(ctx, "coming bookings load into redis")
 		}
 	}
+}
+
+func (s arrangeCottageService) publishCheckinTomorrow(ctx context.Context, bookings []domain.Booking, notificationDay time.Time) error {
+	var publishErr error
+	for _, booking := range bookings {
+		msg := &dto.CheckInTomorrowNotification{
+			BookingId:       booking.Id.Hex(),
+			GuestId:         booking.MainGuest.Hex(),
+			CottageName:     booking.CottageName,
+			CheckIn:         timestamppb.New(booking.StayPeriod.CheckIn.UTC()),
+			CheckOut:        timestamppb.New(booking.StayPeriod.CheckOut.UTC()),
+			NumberOfGuests:  int32(booking.NumberOfGuests),
+			NotificationDay: timestamppb.New(notificationDay.UTC()),
+		}
+
+		routingKey := fmt.Sprintf("guest.%s", booking.MainGuest.Hex())
+		if err := s.guestCommunicationPublisher.Publish(ctx, msg, routingKey); err != nil {
+			slog.ErrorContext(ctx, "failed to publish check-in tomorrow notification",
+				"booking_id", msg.GetBookingId(),
+				"guest_id", msg.GetGuestId(),
+				"routing_key", routingKey,
+				"error", err)
+			publishErr = errors.Join(publishErr, err)
+		}
+	}
+
+	return publishErr
 }
 
 func (s arrangeCottageService) bookingsDocToDomain(ctx context.Context, bookingDocs []documents.Booking) []domain.Booking {
