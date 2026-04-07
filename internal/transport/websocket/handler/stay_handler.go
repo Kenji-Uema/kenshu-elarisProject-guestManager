@@ -318,7 +318,7 @@ func (h StayHandler) cleanCottage(ctx context.Context, cottageName string) error
 
 	logHandlerInfo(ctx, "guest_action_received", guestActionAttrs(msg)...)
 
-	cleaningRequest, err := domain.NewCleaningOrder(cottageName, enum.FullCleaning)
+	cleaningRequest, err := domain.NewCleaningOrder(cottageName, enum.DailyCleaning)
 	if err != nil {
 		return err
 	}
@@ -326,7 +326,7 @@ func (h StayHandler) cleanCottage(ctx context.Context, cottageName string) error
 	if err := h.cleaningService.CleanRoom(ctx, cleaningRequest); err != nil {
 		return err
 	}
-	logHandlerInfo(ctx, "cleaning_requested", "cottage_name", cottageName, "request_type", string(enum.FullCleaning))
+	logHandlerInfo(ctx, "cleaning_requested", "cottage_name", cottageName, "request_type", string(enum.DailyCleaning))
 
 	return nil
 }
