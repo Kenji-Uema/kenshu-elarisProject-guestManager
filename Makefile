@@ -1,4 +1,4 @@
-IMAGE_TAG ?= 1.0.0
+IMAGE_TAG ?= 2.0.2
 
 CONTAINER_TEST_PACKAGES := /integration_test($$|/)|/internal/infra/mdb$$|/internal/infra/mq$$
 SAFE_TEST_PACKAGES := $(shell go list ./... | grep -vE '$(CONTAINER_TEST_PACKAGES)')
