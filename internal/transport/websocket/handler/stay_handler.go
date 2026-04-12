@@ -387,11 +387,3 @@ func (h StayHandler) notifyMeal(ctx context.Context, hour int, notification dto.
 		return nil
 	}
 }
-
-func (h StayHandler) notifyCheckoutToday(ctx context.Context) error {
-	if err := h.writer.SendSystemNotification(ctx, dto.SystemNotification_CHECK_OUT_TODAY); err != nil {
-		return fmt.Errorf("stay handler: send checkout notification: %w", err)
-	}
-
-	return nil
-}

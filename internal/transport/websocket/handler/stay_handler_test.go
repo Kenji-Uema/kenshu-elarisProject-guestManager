@@ -117,9 +117,6 @@ func TestStayHandlerHandle(t *testing.T) {
 		if fakeCleaning.CleanRoomCallCount != 3 {
 			t.Fatalf("Handle() cleaning calls = %d, want 3", fakeCleaning.CleanRoomCallCount)
 		}
-		if !containsNotification(notifications, dto.SystemNotification_CHECK_OUT_TODAY) {
-			t.Fatalf("Handle() notifications = %+v, missing %v", notifications, dto.SystemNotification_CHECK_OUT_TODAY)
-		}
 	})
 
 	t.Run("returns context error when canceled before first day change", func(t *testing.T) {
@@ -231,9 +228,6 @@ func TestStayHandlerHandle(t *testing.T) {
 		}
 		if fakeCleaning.CleanRoomCallCount != 1 {
 			t.Fatalf("Handle() cleaning calls = %d, want 1", fakeCleaning.CleanRoomCallCount)
-		}
-		if !containsNotification(notifications, dto.SystemNotification_CHECK_OUT_TODAY) {
-			t.Fatalf("Handle() notifications = %+v, missing %v", notifications, dto.SystemNotification_CHECK_OUT_TODAY)
 		}
 	})
 
@@ -602,54 +596,6 @@ func TestStayHandlerNotifyDinner(t *testing.T) {
 	}
 }
 
-func TestStayHandlerNotifyCheckoutToday(t *testing.T) {
-	t.Parallel()
-
-	t.Run("sends checkout notification when bookings exist", func(t *testing.T) {
-		fakeWriter := &chatfakes.Writer{}
-		fakeNotifications := &fakeNotificationService{}
-		handler := NewStayHandler(fakeNotifications, &appfakes.CleaningService{}, nil, nil, fakeWriter, &chatfakes.Reader{})
-
-		checkoutCh := make(chan []domain.Booking, 1)
-		fakeNotifications.CheckOutNotificationFn = func(ctx context.Context, bookingCh chan []domain.Booking) {
-			bookingCh <- <-checkoutCh
-		}
-		checkoutCh <- []domain.Booking{mustBooking(t, "cottage-20")}
-
-		err := handler.notifyCheckoutToday(context.Background())
-		if err != nil {
-			t.Fatalf("notifyCheckoutToday() unexpected error: %v", err)
-		}
-		if fakeWriter.SendSystemNotificationCallCount != 1 {
-			t.Fatalf("notifyCheckoutToday() notification calls = %d, want 1", fakeWriter.SendSystemNotificationCallCount)
-		}
-		if fakeWriter.LastSendSystemNotificationValue != dto.SystemNotification_CHECK_OUT_TODAY {
-			t.Fatalf("notifyCheckoutToday() notification = %v, want %v", fakeWriter.LastSendSystemNotificationValue, dto.SystemNotification_CHECK_OUT_TODAY)
-		}
-	})
-
-	t.Run("returns context error when canceled before notification arrives", func(t *testing.T) {
-		fakeWriter := &chatfakes.Writer{}
-		fakeNotifications := &fakeNotificationService{}
-		handler := NewStayHandler(fakeNotifications, &appfakes.CleaningService{}, nil, nil, fakeWriter, &chatfakes.Reader{})
-
-		ctx, cancel := context.WithCancel(context.Background())
-		fakeWriter.SendSystemNotificationFn = func(ctx context.Context, notification dto.SystemNotification) error {
-			return ctx.Err()
-		}
-
-		cancel()
-
-		err := handler.notifyCheckoutToday(ctx)
-		if !errors.Is(err, context.Canceled) {
-			t.Fatalf("notifyCheckoutToday() error = %v, want %v", err, context.Canceled)
-		}
-		if fakeWriter.SendSystemNotificationCallCount != 1 {
-			t.Fatalf("notifyCheckoutToday() notification calls = %d, want 1", fakeWriter.SendSystemNotificationCallCount)
-		}
-	})
-}
-
 type fakeNotificationService struct {
 	HourNotificationFn     func(ctx context.Context, timerCh chan interface{}, hour int)
 	CheckOutNotificationFn func(ctx context.Context, bookingCh chan []domain.Booking)
@@ -719,14 +665,4 @@ func mustMarshalTimeEventStay(t *testing.T, eventTime time.Time) []byte {
 	}
 
 	return payload
-}
-
-func containsNotification(notifications []dto.SystemNotification, want dto.SystemNotification) bool {
-	for _, notification := range notifications {
-		if notification == want {
-			return true
-		}
-	}
-
-	return false
 }

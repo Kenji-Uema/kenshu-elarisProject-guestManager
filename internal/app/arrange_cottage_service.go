@@ -61,23 +61,21 @@ func (s arrangeCottageService) ArrangeCheckIn(ctx context.Context) {
 				return
 			}
 
-			tomorrow := today.AddDate(0, 0, 1)
-
-			bookingDocs, err := s.bookingRepo.FindByCheckInDate(ctx, tomorrow)
+			bookingDocs, err := s.bookingRepo.FindByCheckInDate(ctx, today)
 			if err != nil {
-				slog.ErrorContext(ctx, "failed to find bookings by check-in date", "date", tomorrow, "error", err)
+				slog.ErrorContext(ctx, "failed to find bookings by check-in date", "date", today, "error", err)
 				continue
 			}
 
 			bookings := s.bookingsDocToDomain(ctx, bookingDocs)
-			slog.InfoContext(ctx, "parsed bookings for day-change event", "count", len(bookings), "checkInDate", tomorrow)
+			slog.InfoContext(ctx, "parsed bookings for day-change event", "count", len(bookings), "checkInDate", today)
 
-			if err := s.cacheCheckIn(ctx, err, bookings, tomorrow); err != nil {
+			if err := s.cacheCheckIn(ctx, err, bookings, today); err != nil {
 				slog.ErrorContext(ctx, "failed to cache check-in bookings", "error", err)
 				continue
 			}
-			if err := s.publishCheckinTomorrow(ctx, bookings, today); err != nil {
-				slog.ErrorContext(ctx, "failed to publish check-in tomorrow notifications", "error", err)
+			if err := s.publishCheckinToday(ctx, bookings, today); err != nil {
+				slog.ErrorContext(ctx, "failed to publish check-in today notifications", "error", err)
 				continue
 			}
 			if err := s.cacheCheckOut(ctx, bookings); err != nil {
@@ -90,10 +88,10 @@ func (s arrangeCottageService) ArrangeCheckIn(ctx context.Context) {
 	}
 }
 
-func (s arrangeCottageService) publishCheckinTomorrow(ctx context.Context, bookings []domain.Booking, notificationDay time.Time) error {
+func (s arrangeCottageService) publishCheckinToday(ctx context.Context, bookings []domain.Booking, notificationDay time.Time) error {
 	var publishErr error
 	for _, booking := range bookings {
-		msg := &dto.CheckInTomorrowNotification{
+		msg := &dto.CheckInTodayNotification{
 			BookingId:       booking.Id.Hex(),
 			GuestId:         booking.MainGuest.Hex(),
 			CottageName:     booking.CottageName,
@@ -105,7 +103,7 @@ func (s arrangeCottageService) publishCheckinTomorrow(ctx context.Context, booki
 
 		routingKey := fmt.Sprintf("guest.%s", booking.MainGuest.Hex())
 		if err := s.guestCommunicationPublisher.Publish(ctx, msg, routingKey); err != nil {
-			slog.ErrorContext(ctx, "failed to publish check-in tomorrow notification",
+			slog.ErrorContext(ctx, "failed to publish check-in today notification",
 				"booking_id", msg.GetBookingId(),
 				"guest_id", msg.GetGuestId(),
 				"routing_key", routingKey,
@@ -151,14 +149,14 @@ func (s arrangeCottageService) bookingsDocToDomain(ctx context.Context, bookingD
 	return bookings
 }
 
-func (s arrangeCottageService) cacheCheckIn(ctx context.Context, err error, bookings []domain.Booking, tomorrow time.Time) error {
+func (s arrangeCottageService) cacheCheckIn(ctx context.Context, err error, bookings []domain.Booking, checkInDay time.Time) error {
 	var payload []byte
 	if payload, err = json.Marshal(bookings); err != nil {
-		slog.ErrorContext(ctx, "failed to marshal check-in bookings", "checkInDate", tomorrow, "error", err)
+		slog.ErrorContext(ctx, "failed to marshal check-in bookings", "checkInDate", checkInDay, "error", err)
 		return err
 	}
 
-	redisKey := fmt.Sprintf("checkin.%s", tomorrow.UTC().Format("2006-01-02"))
+	redisKey := fmt.Sprintf("checkin.%s", checkInDay.UTC().Format("2006-01-02"))
 	if err := s.cache.SetBytes(ctx, redisKey, payload, 30*time.Minute); err != nil {
 		slog.ErrorContext(ctx, "failed to save check-in bookings in redis", "key", redisKey, "error", err)
 		return err

@@ -69,7 +69,7 @@ func TestArrangeCheckinConsumesDayChangeEvent(t *testing.T) {
 	}
 
 	select {
-	case timeEvents.LastRegisterChannel <- time.Date(2026, 3, 24, 0, 0, 0, 0, time.UTC):
+	case timeEvents.LastRegisterChannel <- checkInDate:
 	case <-time.After(time.Second):
 		t.Fatal("timed out sending day change event")
 	}
@@ -103,7 +103,7 @@ func TestArrangeCheckinConsumesDayChangeEvent(t *testing.T) {
 	if guestPublisher.PublishCallCount != 1 {
 		t.Fatalf("Publish() calls = %d, want 1", guestPublisher.PublishCallCount)
 	}
-	msg, ok := guestPublisher.LastPublishedMessage.(*dto.CheckInTomorrowNotification)
+	msg, ok := guestPublisher.LastPublishedMessage.(*dto.CheckInTodayNotification)
 	if !ok {
 		t.Fatalf("published message type = %T", guestPublisher.LastPublishedMessage)
 	}
