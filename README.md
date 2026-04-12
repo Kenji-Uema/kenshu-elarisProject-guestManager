@@ -4,7 +4,7 @@ Owns guest records and the guest-facing lodging interaction API.
 
 ## Main Docs
 
-See the main project documentation: <https://github.com/Kenji-Uema/kenshu-elarisProject-docs>
+See the main project documentation: <https://kenji-uema.github.io/kenshu-elarisProject-docs/>
 
 ## What It Does
 
