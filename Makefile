@@ -22,4 +22,4 @@ generate:
 	npx buf generate
 
 docker-build:
-	docker build --build-arg SERVICE_NAME=guest-manager --build-arg VERSION=$(IMAGE_TAG) -t guest-manager:$(IMAGE_TAG) .
+	docker buildx build --build-arg SERVICE_NAME=guest-manager --build-arg VERSION=$(IMAGE_TAG) -t guest-manager:$(IMAGE_TAG) --load .
