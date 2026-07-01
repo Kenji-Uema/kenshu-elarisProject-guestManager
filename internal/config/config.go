@@ -23,9 +23,10 @@ type Configs struct {
 }
 
 type AppConfig struct {
-	ServiceName string `env:"SERVICE_NAME" envDefault:"kenshu-elarisProject-guestManager"`
-	Version     string `env:"VERSION"`
-	Server      struct {
+	ServiceName      string `env:"SERVICE_NAME" envDefault:"guestManager"`
+	Version          string `env:"VERSION" envDefault:"lastest"`
+	ServiceNamespace string `env:"SERVICE_NAMESPACE" envDefault:"unknown"`
+	Server           struct {
 		Host                       string `env:"SERVICE_HOST,required"`
 		Port                       int    `env:"SERVICE_PORT,required"`
 		ReadHeaderTimeoutInSeconds int    `env:"READ_HEADER_TIMEOUT_IN_SECONDS,required" envDefault:"5"`

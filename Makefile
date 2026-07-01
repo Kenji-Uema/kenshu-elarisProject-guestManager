@@ -1,4 +1,4 @@
-IMAGE_TAG ?= 2.0.2
+IMAGE_TAG ?= 1.0.0
 
 CONTAINER_TEST_PACKAGES := /integration_test($$|/)|/internal/infra/mdb$$|/internal/infra/mq$$
 SAFE_TEST_PACKAGES := $(shell go list ./... | grep -vE '$(CONTAINER_TEST_PACKAGES)')
@@ -19,7 +19,7 @@ test-integration:
 	go test ./integration_test/...
 
 generate:
-	npx buf generate
+	buf generate
 
 docker-build:
 	docker buildx build --build-arg SERVICE_NAME=guest-manager --build-arg VERSION=$(IMAGE_TAG) -t guest-manager:$(IMAGE_TAG) --load .

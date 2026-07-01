@@ -40,7 +40,6 @@ func runCleanup(ctx context.Context, cleanup []func(context.Context) error) erro
 }
 
 func main() {
-	slog.SetDefault(logging.NewLogger())
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 	cleanup := make([]func(context.Context) error, 0, 5)
@@ -60,6 +59,8 @@ func main() {
 
 	configs, err := config.LoadConfigs()
 	exitOnError(ctx, "failed to load configs", err)
+
+	slog.SetDefault(logging.NewLogger(configs.AppConfig))
 
 	shutdownTelemetry, err := telemetry.Init(ctx, configs.TelemetryConfig, configs.AppConfig)
 	exitOnError(ctx, "failed to init telemetry", err)
