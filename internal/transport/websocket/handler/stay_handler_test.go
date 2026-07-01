@@ -328,7 +328,7 @@ func TestStayHandlerStayRoutine(t *testing.T) {
 	if len(cleaningRequests) != 2 {
 		t.Fatalf("stayRoutine() cleaning requests len = %d, want 2", len(cleaningRequests))
 	}
-	if cleaningRequests[0].RoomName != booking.CottageName || cleaningRequests[0].RequestType != enum.FullCleaning {
+	if cleaningRequests[0].RoomName != booking.CottageName || cleaningRequests[0].RequestType != enum.DailyCleaning {
 		t.Fatalf("stayRoutine() first cleaning request = %+v", cleaningRequests[0])
 	}
 	if cleaningRequests[1].RoomName != booking.CottageName || cleaningRequests[1].RequestType != enum.PrepareForSleep {

@@ -140,7 +140,7 @@ func TestReceptionServiceCheckIn(t *testing.T) {
 }
 
 func TestReceptionServiceCheckOut(t *testing.T) {
-	t.Run("returns error when checkout date is not today", func(t *testing.T) {
+	t.Run("removes booking even when checkout date is not today", func(t *testing.T) {
 		booking := mustReceptionBooking(
 			t,
 			time.Date(2026, 3, 24, 0, 0, 0, 0, time.UTC),
@@ -164,17 +164,17 @@ func TestReceptionServiceCheckOut(t *testing.T) {
 		}
 
 		err = service.CheckOut(context.Background(), booking, time.Date(2026, 3, 24, 0, 0, 0, 0, time.UTC))
-		if err == nil || err.Error() != "checkout day not today" {
-			t.Fatalf("CheckOut() error = %v, want %q", err, "checkout day not today")
+		if err != nil {
+			t.Fatalf("CheckOut() error = %v", err)
 		}
-		if bookingRepo.UpdateStatusCallCount != 0 {
-			t.Fatalf("UpdateStatus() call count = %d, want 0", bookingRepo.UpdateStatusCallCount)
+		if bookingRepo.UpdateStatusCallCount != 1 {
+			t.Fatalf("UpdateStatus() call count = %d, want 1", bookingRepo.UpdateStatusCallCount)
 		}
-		if cottageRepo.RemovePastBookingCallCount != 0 {
-			t.Fatalf("RemovePastBooking() call count = %d, want 0", cottageRepo.RemovePastBookingCallCount)
+		if cottageRepo.RemovePastBookingCallCount != 1 {
+			t.Fatalf("RemovePastBooking() call count = %d, want 1", cottageRepo.RemovePastBookingCallCount)
 		}
-		if cleaningService.CleanRoomCallCount != 0 {
-			t.Fatalf("CleanRoom() call count = %d, want 0", cleaningService.CleanRoomCallCount)
+		if cleaningService.CleanRoomCallCount != 1 {
+			t.Fatalf("CleanRoom() call count = %d, want 1", cleaningService.CleanRoomCallCount)
 		}
 	})
 

@@ -2,14 +2,14 @@ package integration_test
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/Kenji-Uema/guestManager/integration_test/helpers"
-	"github.com/Kenji-Uema/guestManager/internal/domain/documents"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -20,14 +20,10 @@ import (
 )
 
 const (
-	projectRoot         = "/home/kenjiuema/Documents/projects/guestManager"
-	guestsFixturePath   = projectRoot + "/test_data/guests_fixture.json"
-	bookingsFixturePath = projectRoot + "/test_data/bookings_fixture.json"
-	cottagesFixturePath = projectRoot + "/test_data/cottages_fixture.json"
-	suiteDBName         = "test_db"
-	suiteCleaningEx     = "ex.cleaning.request"
-	suiteDayEx          = "ex.day_change.event"
-	suiteHourEx         = "ex.hour_change.event"
+	suiteDBName     = "test_db"
+	suiteCleaningEx = "ex.cleaning.request"
+	suiteDayEx      = "ex.day_change.event"
+	suiteHourEx     = "ex.hour_change.event"
 )
 
 var (
@@ -183,11 +179,33 @@ func resetFixtureState(t FullGinkgoTInterface) {
 }
 
 func seedFixtures(ctx context.Context) error {
+	projectRoot, err := findProjectRoot()
+	if err != nil {
+		return err
+	}
+
 	return helpers.SeedMongoFromFixtures(ctx, suiteContainers.MongoHost, suiteDBName, map[string]string{
-		"guest":   guestsFixturePath,
-		"booking": bookingsFixturePath,
-		"cottage": cottagesFixturePath,
+		"guest":   filepath.Join(projectRoot, "test_data", "guests_fixture.json"),
+		"booking": filepath.Join(projectRoot, "test_data", "bookings_fixture.json"),
+		"cottage": filepath.Join(projectRoot, "test_data", "cottages_fixture.json"),
 	})
+}
+
+func findProjectRoot() (string, error) {
+	dir, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			return dir, nil
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "", fmt.Errorf("could not find project root from %s", dir)
+		}
+		dir = parent
+	}
 }
 
 func waitForHTTP200OrExit(appPort int, runErrCh <-chan error, timeout time.Duration) error {
@@ -218,16 +236,6 @@ func waitForHTTP200OrExit(appPort int, runErrCh <-chan error, timeout time.Durat
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
-}
-
-func cacheCheckInBookings(t FullGinkgoTInterface, keyDate time.Time, bookings []documents.Booking) {
-	t.Helper()
-
-	payload, err := json.Marshal(bookings)
-	Expect(err).NotTo(HaveOccurred())
-
-	key := fmt.Sprintf("checkin.%s", keyDate.UTC().Format("2006-01-02"))
-	Expect(suiteRedisClient.Set(context.Background(), key, payload, 30*time.Minute).Err()).NotTo(HaveOccurred())
 }
 
 func mustObjectID(t FullGinkgoTInterface, hex string) bson.ObjectID {

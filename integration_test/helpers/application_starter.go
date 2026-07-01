@@ -48,7 +48,13 @@ func ApplicationStart(cfg ApplicationConfig) (stop func(), runErr <-chan error) 
 	}
 
 	cmd := exec.Command(binPath)
-	cmd.Dir = "/home/kenjiuema/Documents/projects/guestManager"
+	projectRoot, err := findProjectRoot()
+	if err != nil {
+		_ = cleanupBuild()
+		runErrCh <- err
+		return stop, runErrCh
+	}
+	cmd.Dir = projectRoot
 	cmd.Env = envWithOverrides(os.Environ(), applicationEnv(cfg))
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -117,7 +123,12 @@ func buildApplicationBinary() (string, func() error, error) {
 
 	binPath := filepath.Join(tempDir, "guest-manager-under-test")
 	buildCmd := exec.Command("go", "build", "-o", binPath, "./internal")
-	buildCmd.Dir = "/home/kenjiuema/Documents/projects/guestManager"
+	projectRoot, err := findProjectRoot()
+	if err != nil {
+		_ = os.RemoveAll(tempDir)
+		return "", func() error { return nil }, err
+	}
+	buildCmd.Dir = projectRoot
 	if err := buildCmd.Run(); err != nil {
 		_ = os.RemoveAll(tempDir)
 		return "", func() error { return nil }, err
@@ -128,6 +139,23 @@ func buildApplicationBinary() (string, func() error, error) {
 	}
 
 	return binPath, cleanup, nil
+}
+
+func findProjectRoot() (string, error) {
+	dir, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			return dir, nil
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "", fmt.Errorf("could not find project root from %s", dir)
+		}
+		dir = parent
+	}
 }
 
 func isExpectedStopError(err error) bool {

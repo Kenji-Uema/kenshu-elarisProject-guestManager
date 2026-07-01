@@ -56,19 +56,25 @@ var _ = Describe("Lodging chat integration", Ordered, func() {
 		Expect(sendGuestAction(conn, dto.GuestAction_GO_FOR_A_BATH)).To(Succeed())
 		expectAck(conn)
 
+		publishHourChange(t, time.Date(2024, 6, 1, 18, 0, 0, 0, time.UTC))
+		expectNotification(conn, dto.SystemNotification_DINNER_READY)
+
+		publishHourChange(t, time.Date(2024, 6, 1, 18, 0, 0, 0, time.UTC))
+		expectNotification(conn, dto.SystemNotification_DINNER_READY)
+
 		Expect(sendGuestAction(conn, dto.GuestAction_GO_FOR_DINNER)).To(Succeed())
 		expectAck(conn)
 
 		Expect(sendGuestAction(conn, dto.GuestAction_GO_TO_SLEEP)).To(Succeed())
 		expectAck(conn)
 
-		publishHourChange(t, time.Date(2024, 6, 2, 6, 0, 0, 0, time.UTC))
-		expectNotification(conn, dto.SystemNotification_BREAKFAST_READY)
-
 		publishDayChange(t, time.Date(2024, 6, 2, 0, 0, 0, 0, time.UTC))
 
 		Expect(sendGuestAction(conn, dto.GuestAction_WAKEUP)).To(Succeed())
 		expectAck(conn)
+
+		publishHourChange(t, time.Date(2024, 6, 2, 6, 0, 0, 0, time.UTC))
+		expectNotification(conn, dto.SystemNotification_BREAKFAST_READY)
 
 		Expect(sendGuestAction(conn, dto.GuestAction_GO_FOR_BREAKFAST)).To(Succeed())
 		expectAck(conn)
@@ -76,14 +82,17 @@ var _ = Describe("Lodging chat integration", Ordered, func() {
 		Expect(sendGuestAction(conn, dto.GuestAction_LEAVE_CLEANUP_NOTIFICATION)).To(Succeed())
 		expectAck(conn)
 
-		publishHourChange(t, time.Date(2024, 6, 2, 18, 0, 0, 0, time.UTC))
-		expectNotification(conn, dto.SystemNotification_DINNER_READY)
-
 		Expect(sendGuestAction(conn, dto.GuestAction_ENJOY_RESORT)).To(Succeed())
 		expectAck(conn)
 
 		Expect(sendGuestAction(conn, dto.GuestAction_GO_FOR_A_BATH)).To(Succeed())
 		expectAck(conn)
+
+		publishHourChange(t, time.Date(2024, 6, 2, 18, 0, 0, 0, time.UTC))
+		expectNotification(conn, dto.SystemNotification_DINNER_READY)
+
+		publishHourChange(t, time.Date(2024, 6, 2, 18, 0, 0, 0, time.UTC))
+		expectNotification(conn, dto.SystemNotification_DINNER_READY)
 
 		Expect(sendGuestAction(conn, dto.GuestAction_GO_FOR_DINNER)).To(Succeed())
 		expectAck(conn)
@@ -93,7 +102,9 @@ var _ = Describe("Lodging chat integration", Ordered, func() {
 
 		suiteClock.Set(time.Date(2024, 6, 5, 9, 0, 0, 0, time.UTC))
 		publishDayChange(t, time.Date(2024, 6, 5, 0, 0, 0, 0, time.UTC))
-		expectNotification(conn, dto.SystemNotification_CHECK_OUT_TODAY)
+
+		Expect(sendGuestAction(conn, dto.GuestAction_WAKEUP)).To(Succeed())
+		expectAck(conn)
 
 		Expect(sendGuestAction(conn, dto.GuestAction_LEAVE_COTTAGE)).To(Succeed())
 		expectAck(conn)
@@ -144,7 +155,7 @@ var _ = Describe("Lodging chat integration", Ordered, func() {
 		Expect(requests).To(Equal([]dto.RequestType{
 			dto.RequestType_PREPARE_FOR_GUEST,
 			dto.RequestType_PREPARE_FOR_SLEEP,
-			dto.RequestType_FULL_CLEANING,
+			dto.RequestType_DAILY_CLEANING,
 			dto.RequestType_PREPARE_FOR_SLEEP,
 			dto.RequestType_FULL_CLEANING,
 		}))
